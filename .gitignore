@@ -1,0 +1,9 @@
+bin/
+obj/
+artifacts/
+.DS_Store
+.vs/
+.vscode/
+*.user
+*.suo
+*.dSYM/

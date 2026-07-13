@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleDevelopmentRegion</key><string>zh_CN</string>
+<key>CFBundleExecutable</key><string>Zoomer</string>
+<key>CFBundleIdentifier</key><string>com.sharin.zoomer</string>
+<key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+<key>CFBundleName</key><string>Zoomer</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>@VERSION@</string>
+<key>CFBundleVersion</key><string>@BUILD_NUMBER@</string>
+<key>LSMinimumSystemVersion</key><string>14.0</string>
+<key>LSUIElement</key><true/>
+<key>NSHighResolutionCapable</key><true/>
+<key>NSScreenCaptureUsageDescription</key><string>Zoomer 仅在用户主动触发时截取鼠标所在显示器的一帧画面，用于本地放大查看。</string>
+</dict></plist>
+
