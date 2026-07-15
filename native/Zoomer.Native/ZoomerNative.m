@@ -209,6 +209,8 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
 @property(nonatomic, strong) NSTextField *hud;
 @property(nonatomic) NSPoint previousDragPoint;
 @property(nonatomic, strong) NSTrackingArea *trackingArea;
+@property(nonatomic) BOOL spotlightActive;
+@property(nonatomic) NSPoint spotlightCenter;
 @end
 
 @implementation ZMRZoomView
@@ -240,17 +242,27 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
     [super updateTrackingAreas];
     if (self.trackingArea) [self removeTrackingArea:self.trackingArea];
     self.trackingArea = [[NSTrackingArea alloc] initWithRect:self.bounds
-        options:NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways owner:self userInfo:nil];
+        options:NSTrackingMouseEnteredAndExited | NSTrackingMouseMoved |
+                NSTrackingActiveAlways | NSTrackingInVisibleRect owner:self userInfo:nil];
     [self addTrackingArea:self.trackingArea];
 }
 - (void)mouseEntered:(NSEvent *)event { [NSCursor.openHandCursor push]; }
 - (void)mouseExited:(NSEvent *)event { [NSCursor pop]; }
+- (void)mouseMoved:(NSEvent *)event {
+    if (!self.spotlightActive) return;
+    self.spotlightCenter = [self convertPoint:event.locationInWindow fromView:nil];
+    [self setNeedsDisplay:YES];
+}
 - (void)mouseDown:(NSEvent *)event {
     self.previousDragPoint = [self convertPoint:event.locationInWindow fromView:nil];
     [NSCursor.closedHandCursor set];
 }
 - (void)mouseDragged:(NSEvent *)event {
     NSPoint point = [self convertPoint:event.locationInWindow fromView:nil];
+    if (self.spotlightActive) {
+        self.spotlightCenter = point;
+        [self setNeedsDisplay:YES];
+    }
     if (self.callbacks.pan_requested)
         self.callbacks.pan_requested(self.callbackContext, point.x - self.previousDragPoint.x,
                                      point.y - self.previousDragPoint.y);
@@ -276,6 +288,15 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
         self.callbacks.magnify_requested(self.callbackContext, event.magnification, anchor.x, anchor.y);
 }
 - (void)keyDown:(NSEvent *)event {
+    if (event.keyCode == 3) {
+        if (!self.spotlightActive) {
+            self.spotlightActive = YES;
+            self.spotlightCenter = [self convertPoint:self.window.mouseLocationOutsideOfEventStream
+                                              fromView:nil];
+            [self setNeedsDisplay:YES];
+        }
+        return;
+    }
     if (event.keyCode == 53) {
         if (self.callbacks.dismiss_requested) self.callbacks.dismiss_requested(self.callbackContext);
         return;
@@ -285,6 +306,23 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
         return;
     }
     [super keyDown:event];
+}
+- (void)keyUp:(NSEvent *)event {
+    if (event.keyCode == 3) {
+        if (self.spotlightActive) {
+            self.spotlightActive = NO;
+            [self setNeedsDisplay:YES];
+        }
+        return;
+    }
+    [super keyUp:event];
+}
+- (BOOL)resignFirstResponder {
+    if (self.spotlightActive) {
+        self.spotlightActive = NO;
+        [self setNeedsDisplay:YES];
+    }
+    return [super resignFirstResponder];
 }
 - (void)showHUD {
     self.hud.stringValue = [NSString stringWithFormat:@"%.0f%%", self.scale * 100.0];
@@ -309,6 +347,30 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
     CGContextRef cg = NSGraphicsContext.currentContext.CGContext;
     CGContextSetInterpolationQuality(cg, kCGInterpolationHigh);
     CGContextDrawImage(cg, NSRectToCGRect(destination), self.image);
+
+    if (self.spotlightActive) {
+        static const CGFloat radius = 90.0;
+        static CGGradientRef gradient;
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+            static const CGFloat components[] = {
+                0.0, 0.0,
+                0.0, 0.0,
+                0.0, 0.72,
+            };
+            static const CGFloat locations[] = { 0.0, 0.72, 1.0 };
+            CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceGray();
+            gradient = CGGradientCreateWithColorComponents(
+                colorSpace, components, locations, 3);
+            CGColorSpaceRelease(colorSpace);
+        });
+
+        CGContextSaveGState(cg);
+        CGContextDrawRadialGradient(cg, gradient, self.spotlightCenter, 0.0,
+                                    self.spotlightCenter, radius,
+                                    kCGGradientDrawsAfterEndLocation);
+        CGContextRestoreGState(cg);
+    }
 }
 - (void)dealloc { if (_image) CGImageRelease(_image); }
 @end
@@ -319,6 +381,7 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
 @property(nonatomic) CGDirectDisplayID displayID;
 @property(nonatomic, strong) id screenObserver;
 @property(nonatomic, strong) id spaceObserver;
+@property(nonatomic, strong) id keyObserver;
 @end
 @implementation ZMRWindowBox
 @end
@@ -346,6 +409,7 @@ void *zmr_window_create(void *context, zmr_window_callbacks callbacks,
         styleMask:NSWindowStyleMaskBorderless backing:NSBackingStoreBuffered defer:NO screen:target];
     window.backgroundColor = NSColor.blackColor;
     window.opaque = YES;
+    window.acceptsMouseMovedEvents = YES;
     window.level = NSMainMenuWindowLevel;
     window.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary;
     window.releasedWhenClosed = NO;
@@ -365,6 +429,14 @@ void *zmr_window_create(void *context, zmr_window_callbacks callbacks,
     box.spaceObserver = [NSWorkspace.sharedWorkspace.notificationCenter addObserverForName:NSWorkspaceActiveSpaceDidChangeNotification
         object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
         ZMRWindowBox *strongBox = weakBox; if (strongBox) ZMRCheckDisplay(strongBox);
+    }];
+    box.keyObserver = [NSNotificationCenter.defaultCenter addObserverForName:NSWindowDidResignKeyNotification
+        object:window queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
+        ZMRWindowBox *strongBox = weakBox;
+        if (strongBox && strongBox.view.spotlightActive) {
+            strongBox.view.spotlightActive = NO;
+            [strongBox.view setNeedsDisplay:YES];
+        }
     }];
     return (__bridge_retained void *)box;
 }
@@ -392,6 +464,7 @@ void zmr_window_destroy(void *handle) {
     ZMRWindowBox *box = (__bridge_transfer ZMRWindowBox *)handle;
     if (box.screenObserver) [NSNotificationCenter.defaultCenter removeObserver:box.screenObserver];
     if (box.spaceObserver) [NSWorkspace.sharedWorkspace.notificationCenter removeObserver:box.spaceObserver];
+    if (box.keyObserver) [NSNotificationCenter.defaultCenter removeObserver:box.keyObserver];
     box.view.callbacks = (zmr_window_callbacks){0};
     [box.window close];
     box.window = nil;

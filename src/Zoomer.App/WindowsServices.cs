@@ -94,12 +94,15 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
 {
     private const int WmMouseHWheel = 0x020E;
     private const uint SwpNoOwnerZOrder = 0x0200;
+    private const double SpotlightRadius = 90.0;
     private static readonly nint HwndTopmost = new(-1);
 
     private readonly Grid _root;
     private readonly System.Windows.Controls.Image _image;
     private readonly Border _hud;
     private readonly TextBlock _hudText;
+    private readonly RadialGradientBrush _spotlightBrush;
+    private readonly System.Windows.Shapes.Rectangle _spotlight;
     private readonly MatrixTransform _imageTransform = new();
     private readonly DispatcherTimer _qualityTimer;
     private readonly DispatcherTimer _hudDelayTimer;
@@ -134,6 +137,28 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
         };
         RenderOptions.SetBitmapScalingMode(_image, BitmapScalingMode.HighQuality);
 
+        _spotlightBrush = new RadialGradientBrush
+        {
+            Center = new System.Windows.Point(0, 0),
+            GradientOrigin = new System.Windows.Point(0, 0),
+            MappingMode = BrushMappingMode.Absolute,
+            RadiusX = SpotlightRadius,
+            RadiusY = SpotlightRadius,
+            SpreadMethod = GradientSpreadMethod.Pad,
+        };
+        _spotlightBrush.GradientStops.Add(new GradientStop(
+            System.Windows.Media.Colors.Transparent, 0));
+        _spotlightBrush.GradientStops.Add(new GradientStop(
+            System.Windows.Media.Colors.Transparent, 0.72));
+        _spotlightBrush.GradientStops.Add(new GradientStop(
+            System.Windows.Media.Color.FromArgb(184, 0, 0, 0), 1));
+        _spotlight = new System.Windows.Shapes.Rectangle
+        {
+            Fill = _spotlightBrush,
+            IsHitTestVisible = false,
+            Visibility = Visibility.Collapsed,
+        };
+
         _hudText = new TextBlock
         {
             FontFamily = new System.Windows.Media.FontFamily("Consolas"),
@@ -164,6 +189,7 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
             ClipToBounds = true,
         };
         _root.Children.Add(_image);
+        _root.Children.Add(_spotlight);
         _root.Children.Add(_hud);
         Content = _root;
 
@@ -331,6 +357,8 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
     protected override void OnMouseMove(System.Windows.Input.MouseEventArgs e)
     {
         base.OnMouseMove(e);
+        if (_spotlight.Visibility == Visibility.Visible)
+            UpdateSpotlightCenter(e.GetPosition(_root));
         if (!_dragging) return;
         if (e.LeftButton != MouseButtonState.Pressed)
         {
@@ -373,6 +401,12 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
 
     protected override void OnPreviewKeyDown(System.Windows.Input.KeyEventArgs e)
     {
+        if (e.Key == Key.F)
+        {
+            SetSpotlightActive(true);
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.Escape)
         {
             DismissRequested?.Invoke();
@@ -387,6 +421,42 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
             return;
         }
         base.OnPreviewKeyDown(e);
+    }
+
+    protected override void OnPreviewKeyUp(System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == Key.F)
+        {
+            SetSpotlightActive(false);
+            e.Handled = true;
+            return;
+        }
+        base.OnPreviewKeyUp(e);
+    }
+
+    protected override void OnDeactivated(EventArgs e)
+    {
+        SetSpotlightActive(false);
+        base.OnDeactivated(e);
+    }
+
+    private void SetSpotlightActive(bool active)
+    {
+        if (active)
+        {
+            UpdateSpotlightCenter(Mouse.GetPosition(_root));
+            _spotlight.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            _spotlight.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void UpdateSpotlightCenter(System.Windows.Point point)
+    {
+        _spotlightBrush.Center = point;
+        _spotlightBrush.GradientOrigin = point;
     }
 
     private nint WindowMessageHook(nint hwnd, int message, nint wParam, nint lParam,
