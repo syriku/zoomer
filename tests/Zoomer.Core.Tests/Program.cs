@@ -9,6 +9,7 @@ var tests = new (string Name, Action Run)[]
     ("Transform applies magnification", TestMagnification),
     ("Transform rejects invalid magnification", TestInvalidMagnification),
     ("Transform translates and resets", TestTranslateReset),
+    ("Transform toggles horizontal flip", TestHorizontalFlip),
     ("Workspace rejects duplicate capture", TestDuplicateCapture),
     ("Workspace presents and dismisses", TestPresentDismiss),
     ("Workspace discards stale image", TestStaleImage),
@@ -78,6 +79,19 @@ static void TestTranslateReset()
     var model = new TransformModel();
     model.Translate(12, -8);
     Equal(new TransformState(1, 12, -8), model.State);
+    model.Reset();
+    Equal(TransformState.Identity, model.State);
+}
+
+static void TestHorizontalFlip()
+{
+    var model = new TransformModel();
+    model.Translate(12, -8);
+    model.ToggleHorizontalFlip();
+    Equal(new TransformState(1, 12, -8, true), model.State);
+    model.ToggleHorizontalFlip();
+    Equal(new TransformState(1, 12, -8), model.State);
+    model.ToggleHorizontalFlip();
     model.Reset();
     Equal(TransformState.Identity, model.State);
 }
@@ -162,6 +176,11 @@ static void TestMagnifyPan()
 
     f.Window.RaisePan(10, -4);
     Equal((new TransformState(1.25, -2.5, -16.5), false), f.Window.Updates[^1]);
+
+    f.Window.RaiseHorizontalFlip();
+    Equal((new TransformState(1.25, -2.5, -16.5, true), false), f.Window.Updates[^1]);
+    f.Window.RaiseHorizontalFlip();
+    Equal((new TransformState(1.25, -2.5, -16.5), false), f.Window.Updates[^1]);
 }
 
 static void Equal<T>(T expected, T actual)
@@ -220,6 +239,7 @@ sealed class FakeWindow : INativeWorkspaceWindow
     public event Action<double, double, double>? MagnifyRequested;
     public event Action<double, double>? PanRequested;
     public event Action? ResetRequested;
+    public event Action? ToggleHorizontalFlipRequested;
     public event Action? TargetDisplayDisconnected;
     public bool Shown { get; private set; }
     public bool Disposed { get; private set; }
@@ -237,6 +257,7 @@ sealed class FakeWindow : INativeWorkspaceWindow
     public void RaiseMagnify(double magnification, double x, double y)
         => MagnifyRequested?.Invoke(magnification, x, y);
     public void RaisePan(double dx, double dy) => PanRequested?.Invoke(dx, dy);
+    public void RaiseHorizontalFlip() => ToggleHorizontalFlipRequested?.Invoke();
     public void Dispose()
     {
         Disposed = true;

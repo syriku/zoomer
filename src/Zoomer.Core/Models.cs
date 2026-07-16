@@ -26,7 +26,11 @@ public readonly record struct DisplayDescriptor(
     double Height,
     double BackingScale);
 
-public readonly record struct TransformState(double Scale, double OffsetX, double OffsetY)
+public readonly record struct TransformState(
+    double Scale,
+    double OffsetX,
+    double OffsetY,
+    bool IsHorizontallyFlipped = false)
 {
     public static TransformState Identity => new(1, 0, 0);
 }

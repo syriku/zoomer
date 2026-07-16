@@ -39,6 +39,7 @@ typedef struct {
     zmr_pan_callback pan_requested;
     zmr_simple_callback reset_requested;
     zmr_simple_callback display_disconnected;
+    zmr_simple_callback toggle_horizontal_flip_requested;
 } zmr_window_callbacks;
 
 int32_t zmr_app_initialize(void *context, zmr_app_callbacks callbacks);
@@ -60,7 +61,8 @@ void *zmr_window_create(void *context, zmr_window_callbacks callbacks,
                         void *image, zmr_display_descriptor display);
 void zmr_window_show(void *window);
 void zmr_window_update_transform(void *window, double scale, double offset_x,
-                                 double offset_y, bool show_hud);
+                                  double offset_y, bool horizontally_flipped,
+                                  bool show_hud);
 void zmr_window_destroy(void *window);
 
 #ifdef __cplusplus

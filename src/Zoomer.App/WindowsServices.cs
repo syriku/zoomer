@@ -115,6 +115,7 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
     private bool _monitoringDisplays;
     private bool _closed;
     private bool _disposed;
+    private TransformState _transform = TransformState.Identity;
 
     public WindowsWorkspaceWindow()
     {
@@ -135,6 +136,7 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
             SnapsToDevicePixels = true,
             Stretch = Stretch.Fill,
         };
+        _image.SizeChanged += (_, _) => ApplyTransform();
         RenderOptions.SetBitmapScalingMode(_image, BitmapScalingMode.HighQuality);
 
         _spotlightBrush = new RadialGradientBrush
@@ -210,6 +212,7 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
     public event Action<double, double, double>? MagnifyRequested;
     public event Action<double, double>? PanRequested;
     public event Action? ResetRequested;
+    public event Action? ToggleHorizontalFlipRequested;
     public event Action? TargetDisplayDisconnected;
 
     WindowShowResult INativeWorkspaceWindow.Show(ICaptureFrame frame, DisplayDescriptor display)
@@ -307,14 +310,24 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
     {
         if (_disposed) return;
 
-        _imageTransform.Matrix = new Matrix(transform.Scale, 0, 0, transform.Scale,
-            transform.OffsetX, transform.OffsetY);
+        _transform = transform;
+        ApplyTransform();
         RenderOptions.SetBitmapScalingMode(_image, BitmapScalingMode.Linear);
         _qualityTimer.Stop();
         _qualityTimer.Start();
 
         if (showHud)
             ShowHud(transform.Scale);
+    }
+
+    private void ApplyTransform()
+    {
+        var scaleX = _transform.IsHorizontallyFlipped ? -_transform.Scale : _transform.Scale;
+        var offsetX = _transform.IsHorizontallyFlipped
+            ? _transform.OffsetX + (_image.ActualWidth * _transform.Scale)
+            : _transform.OffsetX;
+        _imageTransform.Matrix = new Matrix(scaleX, 0, 0, _transform.Scale,
+            offsetX, _transform.OffsetY);
     }
 
     private void RestoreHighQuality(object? sender, EventArgs e)
@@ -401,6 +414,13 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
 
     protected override void OnPreviewKeyDown(System.Windows.Input.KeyEventArgs e)
     {
+        if (e.Key == Key.M)
+        {
+            if (!e.IsRepeat)
+                ToggleHorizontalFlipRequested?.Invoke();
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.F)
         {
             SetSpotlightActive(true);

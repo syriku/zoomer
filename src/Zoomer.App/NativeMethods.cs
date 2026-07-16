@@ -36,6 +36,7 @@ internal static unsafe class NativeMethods
         internal delegate* unmanaged[Cdecl]<nint, double, double, void> PanRequested;
         internal delegate* unmanaged[Cdecl]<nint, void> ResetRequested;
         internal delegate* unmanaged[Cdecl]<nint, void> DisplayDisconnected;
+        internal delegate* unmanaged[Cdecl]<nint, void> ToggleHorizontalFlipRequested;
     }
 
     [DllImport(Library, EntryPoint = "zmr_app_initialize")]
@@ -79,7 +80,9 @@ internal static unsafe class NativeMethods
 
     [DllImport(Library, EntryPoint = "zmr_window_update_transform")]
     internal static extern void WindowUpdateTransform(nint window, double scale,
-        double offsetX, double offsetY, [MarshalAs(UnmanagedType.I1)] bool showHud);
+        double offsetX, double offsetY,
+        [MarshalAs(UnmanagedType.I1)] bool horizontallyFlipped,
+        [MarshalAs(UnmanagedType.I1)] bool showHud);
 
     [DllImport(Library, EntryPoint = "zmr_window_destroy")]
     internal static extern void WindowDestroy(nint window);

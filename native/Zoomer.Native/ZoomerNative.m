@@ -204,6 +204,7 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
 @property(nonatomic) CGImageRef image;
 @property(nonatomic) double scale;
 @property(nonatomic) NSPoint offset;
+@property(nonatomic) BOOL horizontallyFlipped;
 @property(nonatomic) void *callbackContext;
 @property(nonatomic) zmr_window_callbacks callbacks;
 @property(nonatomic, strong) NSTextField *hud;
@@ -288,6 +289,11 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
         self.callbacks.magnify_requested(self.callbackContext, event.magnification, anchor.x, anchor.y);
 }
 - (void)keyDown:(NSEvent *)event {
+    if (event.keyCode == kVK_ANSI_M) {
+        if (!event.isARepeat && self.callbacks.toggle_horizontal_flip_requested)
+            self.callbacks.toggle_horizontal_flip_requested(self.callbackContext);
+        return;
+    }
     if (event.keyCode == 3) {
         if (!self.spotlightActive) {
             self.spotlightActive = YES;
@@ -346,7 +352,13 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
                                     NSHeight(self.bounds) * self.scale);
     CGContextRef cg = NSGraphicsContext.currentContext.CGContext;
     CGContextSetInterpolationQuality(cg, kCGInterpolationHigh);
+    if (self.horizontallyFlipped) {
+        CGContextSaveGState(cg);
+        CGContextTranslateCTM(cg, NSMinX(destination) + NSMaxX(destination), 0);
+        CGContextScaleCTM(cg, -1, 1);
+    }
     CGContextDrawImage(cg, NSRectToCGRect(destination), self.image);
+    if (self.horizontallyFlipped) CGContextRestoreGState(cg);
 
     if (self.spotlightActive) {
         static const CGFloat radius = 90.0;
@@ -450,11 +462,13 @@ void zmr_window_show(void *handle) {
 }
 
 void zmr_window_update_transform(void *handle, double scale, double offsetX,
-                                 double offsetY, bool showHUD) {
+                                  double offsetY, bool horizontallyFlipped,
+                                  bool showHUD) {
     ZMRWindowBox *box = (__bridge ZMRWindowBox *)handle;
     if (!box) return;
     box.view.scale = scale;
     box.view.offset = NSMakePoint(offsetX, offsetY);
+    box.view.horizontallyFlipped = horizontallyFlipped;
     [box.view setNeedsDisplay:YES];
     if (showHUD) [box.view showHUD];
 }

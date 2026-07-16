@@ -69,6 +69,7 @@ internal sealed unsafe class NativeWorkspaceWindow : INativeWorkspaceWindow
     public event Action<double, double, double>? MagnifyRequested;
     public event Action<double, double>? PanRequested;
     public event Action? ResetRequested;
+    public event Action? ToggleHorizontalFlipRequested;
     public event Action? TargetDisplayDisconnected;
 
     public WindowShowResult Show(ICaptureFrame frame, DisplayDescriptor display)
@@ -86,6 +87,7 @@ internal sealed unsafe class NativeWorkspaceWindow : INativeWorkspaceWindow
             PanRequested = &OnPan,
             ResetRequested = &OnReset,
             DisplayDisconnected = &OnDisplayDisconnected,
+            ToggleHorizontalFlipRequested = &OnToggleHorizontalFlip,
         };
         var nativeDisplay = new NativeMethods.NativeDisplayDescriptor
         {
@@ -108,7 +110,7 @@ internal sealed unsafe class NativeWorkspaceWindow : INativeWorkspaceWindow
     {
         if (_handle != 0)
             NativeMethods.WindowUpdateTransform(_handle, transform.Scale,
-                transform.OffsetX, transform.OffsetY, showHud);
+                transform.OffsetX, transform.OffsetY, transform.IsHorizontallyFlipped, showHud);
     }
 
     private static NativeWorkspaceWindow FromContext(nint context)
@@ -135,6 +137,10 @@ internal sealed unsafe class NativeWorkspaceWindow : INativeWorkspaceWindow
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void OnDisplayDisconnected(nint context)
         => FromContext(context).TargetDisplayDisconnected?.Invoke();
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void OnToggleHorizontalFlip(nint context)
+        => FromContext(context).ToggleHorizontalFlipRequested?.Invoke();
 
     public void Dispose()
     {

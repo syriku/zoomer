@@ -51,5 +51,8 @@ public sealed class TransformModel
         };
     }
 
+    public void ToggleHorizontalFlip()
+        => State = State with { IsHorizontallyFlipped = !State.IsHorizontallyFlipped };
+
     public void Reset() => State = TransformState.Identity;
 }

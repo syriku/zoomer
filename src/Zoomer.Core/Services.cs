@@ -27,6 +27,7 @@ public interface INativeWorkspaceWindow : IDisposable
     event Action<double, double, double>? MagnifyRequested;
     event Action<double, double>? PanRequested;
     event Action? ResetRequested;
+    event Action? ToggleHorizontalFlipRequested;
     event Action? TargetDisplayDisconnected;
 
     // The window takes ownership of frame only when the result is successful.

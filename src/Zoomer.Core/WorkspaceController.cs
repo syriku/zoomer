@@ -110,6 +110,12 @@ public sealed class WorkspaceController : IDisposable
             _transform.Reset();
             window.UpdateTransform(_transform.State, showHud: true);
         };
+        window.ToggleHorizontalFlipRequested += () =>
+        {
+            if (State != WorkspaceState.Presenting) return;
+            _transform.ToggleHorizontalFlip();
+            window.UpdateTransform(_transform.State, showHud: false);
+        };
         window.ZoomRequested += (delta, x, y) =>
         {
             if (State != WorkspaceState.Presenting) return;
