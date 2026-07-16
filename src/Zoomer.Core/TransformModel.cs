@@ -37,7 +37,8 @@ public sealed class TransformModel
         State = new TransformState(
             nextScale,
             anchorX - ((anchorX - old.OffsetX) * ratio),
-            anchorY - ((anchorY - old.OffsetY) * ratio));
+            anchorY - ((anchorY - old.OffsetY) * ratio),
+            old.IsHorizontallyFlipped);
         return true;
     }
 

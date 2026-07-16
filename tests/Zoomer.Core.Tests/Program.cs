@@ -89,8 +89,10 @@ static void TestHorizontalFlip()
     model.Translate(12, -8);
     model.ToggleHorizontalFlip();
     Equal(new TransformState(1, 12, -8, true), model.State);
+    model.ZoomByFactor(2, 0, 0);
+    Equal(new TransformState(2, 24, -16, true), model.State);
     model.ToggleHorizontalFlip();
-    Equal(new TransformState(1, 12, -8), model.State);
+    Equal(new TransformState(2, 24, -16), model.State);
     model.ToggleHorizontalFlip();
     model.Reset();
     Equal(TransformState.Identity, model.State);
