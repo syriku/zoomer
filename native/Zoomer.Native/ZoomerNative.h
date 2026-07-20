@@ -38,6 +38,8 @@ typedef struct {
     zmr_magnify_callback magnify_requested;
     zmr_pan_callback pan_requested;
     zmr_simple_callback reset_requested;
+    zmr_simple_callback full_reset_requested;
+    zmr_pan_callback center_requested;
     zmr_simple_callback display_disconnected;
     zmr_simple_callback toggle_horizontal_flip_requested;
 } zmr_window_callbacks;

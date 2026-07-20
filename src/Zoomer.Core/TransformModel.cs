@@ -55,5 +55,20 @@ public sealed class TransformModel
     public void ToggleHorizontalFlip()
         => State = State with { IsHorizontallyFlipped = !State.IsHorizontallyFlipped };
 
+    public void ResetScale() => State = State with { Scale = 1.0 };
+
+    public void Center(double width, double height)
+    {
+        if (!double.IsFinite(width) || width < 0 ||
+            !double.IsFinite(height) || height < 0)
+            return;
+
+        State = State with
+        {
+            OffsetX = (width - (width * State.Scale)) / 2,
+            OffsetY = (height - (height * State.Scale)) / 2,
+        };
+    }
+
     public void Reset() => State = TransformState.Identity;
 }

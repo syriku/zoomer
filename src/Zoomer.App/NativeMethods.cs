@@ -35,6 +35,8 @@ internal static unsafe class NativeMethods
         internal delegate* unmanaged[Cdecl]<nint, double, double, double, void> MagnifyRequested;
         internal delegate* unmanaged[Cdecl]<nint, double, double, void> PanRequested;
         internal delegate* unmanaged[Cdecl]<nint, void> ResetRequested;
+        internal delegate* unmanaged[Cdecl]<nint, void> FullResetRequested;
+        internal delegate* unmanaged[Cdecl]<nint, double, double, void> CenterRequested;
         internal delegate* unmanaged[Cdecl]<nint, void> DisplayDisconnected;
         internal delegate* unmanaged[Cdecl]<nint, void> ToggleHorizontalFlipRequested;
     }

@@ -480,6 +480,17 @@ static const CGFloat ZMRLaserDrawingMinimumPointDistanceSquared = 0.25;
         if (self.callbacks.reset_requested) self.callbacks.reset_requested(self.callbackContext);
         return;
     }
+    if (!event.isARepeat && !hasShortcutModifier && event.keyCode == kVK_ANSI_R) {
+        if (self.callbacks.full_reset_requested)
+            self.callbacks.full_reset_requested(self.callbackContext);
+        return;
+    }
+    if (!event.isARepeat && !hasShortcutModifier && event.keyCode == kVK_ANSI_C) {
+        if (self.callbacks.center_requested)
+            self.callbacks.center_requested(self.callbackContext,
+                                            NSWidth(self.bounds), NSHeight(self.bounds));
+        return;
+    }
     if (!event.isARepeat && !hasShortcutModifier) {
         double presetScale = 0.0;
         switch (event.keyCode) {

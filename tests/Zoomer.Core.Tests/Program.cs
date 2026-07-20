@@ -10,6 +10,8 @@ var tests = new (string Name, Action Run)[]
     ("Transform reaches preset scales", TestPresetScales),
     ("Transform rejects invalid magnification", TestInvalidMagnification),
     ("Transform translates and resets", TestTranslateReset),
+    ("Transform resets only scale", TestResetScale),
+    ("Transform centers without changing scale", TestCenter),
     ("Transform toggles horizontal flip", TestHorizontalFlip),
     ("Workspace rejects duplicate capture", TestDuplicateCapture),
     ("Workspace presents and dismisses", TestPresentDismiss),
@@ -19,6 +21,7 @@ var tests = new (string Name, Action Run)[]
     ("Workspace maps capture failure", TestCaptureFailure),
     ("Workspace requests permission", TestPermission),
     ("Workspace routes magnify and pan", TestMagnifyPan),
+    ("Workspace routes reset shortcuts and center", TestResetShortcutsCenter),
 };
 
 var failed = 0;
@@ -100,6 +103,26 @@ static void TestTranslateReset()
     Equal(new TransformState(1, 12, -8), model.State);
     model.Reset();
     Equal(TransformState.Identity, model.State);
+}
+
+static void TestResetScale()
+{
+    var model = new TransformModel();
+    model.ZoomByFactor(2, 0, 0);
+    model.Translate(12, -8);
+    model.ToggleHorizontalFlip();
+    model.ResetScale();
+    Equal(new TransformState(1, 12, -8, true), model.State);
+}
+
+static void TestCenter()
+{
+    var model = new TransformModel();
+    model.ZoomByFactor(2, 0, 0);
+    model.Translate(12, -8);
+    model.ToggleHorizontalFlip();
+    model.Center(100, 80);
+    Equal(new TransformState(2, -50, -40, true), model.State);
 }
 
 static void TestHorizontalFlip()
@@ -204,6 +227,26 @@ static void TestMagnifyPan()
     Equal((new TransformState(1.25, -2.5, -16.5), false), f.Window.Updates[^1]);
 }
 
+static void TestResetShortcutsCenter()
+{
+    var f = new Fixture();
+    f.Controller.RequestPresentation();
+    f.Capture.CompleteSuccess();
+
+    f.Window.RaiseMagnify(1, 0, 0);
+    f.Window.RaisePan(12, -8);
+    f.Window.RaiseReset();
+    Equal((new TransformState(1, 12, -8), true), f.Window.Updates[^1]);
+
+    f.Window.RaiseMagnify(1, 0, 0);
+    f.Window.RaiseCenter(100, 100);
+    Equal((new TransformState(2, -50, -50), false), f.Window.Updates[^1]);
+
+    f.Window.RaiseHorizontalFlip();
+    f.Window.RaiseFullReset();
+    Equal((TransformState.Identity, true), f.Window.Updates[^1]);
+}
+
 static void Equal<T>(T expected, T actual)
 {
     if (!EqualityComparer<T>.Default.Equals(expected, actual))
@@ -260,6 +303,8 @@ sealed class FakeWindow : INativeWorkspaceWindow
     public event Action<double, double, double>? MagnifyRequested;
     public event Action<double, double>? PanRequested;
     public event Action? ResetRequested;
+    public event Action? FullResetRequested;
+    public event Action<double, double>? CenterRequested;
     public event Action? ToggleHorizontalFlipRequested;
     public event Action? TargetDisplayDisconnected;
     public bool Shown { get; private set; }
@@ -278,6 +323,9 @@ sealed class FakeWindow : INativeWorkspaceWindow
     public void RaiseMagnify(double magnification, double x, double y)
         => MagnifyRequested?.Invoke(magnification, x, y);
     public void RaisePan(double dx, double dy) => PanRequested?.Invoke(dx, dy);
+    public void RaiseReset() => ResetRequested?.Invoke();
+    public void RaiseFullReset() => FullResetRequested?.Invoke();
+    public void RaiseCenter(double width, double height) => CenterRequested?.Invoke(width, height);
     public void RaiseHorizontalFlip() => ToggleHorizontalFlipRequested?.Invoke();
     public void Dispose()
     {

@@ -244,6 +244,8 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
     public event Action<double, double, double>? MagnifyRequested;
     public event Action<double, double>? PanRequested;
     public event Action? ResetRequested;
+    public event Action? FullResetRequested;
+    public event Action<double, double>? CenterRequested;
     public event Action? ToggleHorizontalFlipRequested;
     public event Action? TargetDisplayDisconnected;
 
@@ -581,6 +583,20 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
     {
         if (TryHandlePresetScale(e))
             return;
+        if (e.Key == Key.R && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            if (!e.IsRepeat)
+                FullResetRequested?.Invoke();
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            if (!e.IsRepeat)
+                CenterRequested?.Invoke(_root.ActualWidth, _root.ActualHeight);
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.D && Keyboard.Modifiers == ModifierKeys.None)
         {
             if (!e.IsRepeat)
@@ -667,9 +683,7 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
             return false;
 
         if (scale.Value == 1.0)
-        {
             ResetRequested?.Invoke();
-        }
         else
         {
             var point = Mouse.GetPosition(_root);

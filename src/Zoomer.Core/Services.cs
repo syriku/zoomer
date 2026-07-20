@@ -27,6 +27,8 @@ public interface INativeWorkspaceWindow : IDisposable
     event Action<double, double, double>? MagnifyRequested;
     event Action<double, double>? PanRequested;
     event Action? ResetRequested;
+    event Action? FullResetRequested;
+    event Action<double, double>? CenterRequested;
     event Action? ToggleHorizontalFlipRequested;
     event Action? TargetDisplayDisconnected;
 

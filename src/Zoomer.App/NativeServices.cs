@@ -69,6 +69,8 @@ internal sealed unsafe class NativeWorkspaceWindow : INativeWorkspaceWindow
     public event Action<double, double, double>? MagnifyRequested;
     public event Action<double, double>? PanRequested;
     public event Action? ResetRequested;
+    public event Action? FullResetRequested;
+    public event Action<double, double>? CenterRequested;
     public event Action? ToggleHorizontalFlipRequested;
     public event Action? TargetDisplayDisconnected;
 
@@ -86,6 +88,8 @@ internal sealed unsafe class NativeWorkspaceWindow : INativeWorkspaceWindow
             MagnifyRequested = &OnMagnify,
             PanRequested = &OnPan,
             ResetRequested = &OnReset,
+            FullResetRequested = &OnFullReset,
+            CenterRequested = &OnCenter,
             DisplayDisconnected = &OnDisplayDisconnected,
             ToggleHorizontalFlipRequested = &OnToggleHorizontalFlip,
         };
@@ -133,6 +137,13 @@ internal sealed unsafe class NativeWorkspaceWindow : INativeWorkspaceWindow
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void OnReset(nint context) => FromContext(context).ResetRequested?.Invoke();
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void OnFullReset(nint context) => FromContext(context).FullResetRequested?.Invoke();
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void OnCenter(nint context, double width, double height)
+        => FromContext(context).CenterRequested?.Invoke(width, height);
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void OnDisplayDisconnected(nint context)
