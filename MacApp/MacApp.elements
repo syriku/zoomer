@@ -1,10 +1,9 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <PropertyGroup>
     <RootNamespace>MacApp</RootNamespace>
-    <ProjectGuid>{658cd7d4-9a88-4bbe-b43d-edde30d0da56}</ProjectGuid>
+    <ProjectGuid>{658CD7D4-9A88-4BBE-B43D-EDDE30D0DA56}</ProjectGuid>
     <OutputType>Executable</OutputType>
-    <AssemblyName>MacApp</AssemblyName>
     <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
     <SDK>macOS</SDK>
     <MangleTypeNames>True</MangleTypeNames>
@@ -12,6 +11,7 @@
     <InfoPListFile>.\Resources\Info.plist</InfoPListFile>
     <EntitlementsFile>Resources\Entitlements.entitlements</EntitlementsFile>
     <MacIconFile>.\Resources\App.icns</MacIconFile>
+    <BinaryName>Zoomer</BinaryName>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <Optimize>False</Optimize>
@@ -34,9 +34,7 @@
     <Reference Include="libToffee" />
     <Reference Include="libElements" />
     <Reference Include="libMercury" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="Shared">
+    <ProjectReference Include="..\Shared\Shared.elements">
       <Project>{14908247-56B9-47D8-81F5-CD1A6D1C3137}</Project>
       <ProjectFile>..\Shared\Shared.elements</ProjectFile>
     </ProjectReference>
@@ -50,14 +48,12 @@
     <Compile Include="MacWorkspaceSurfaceActual.vb" />
     <Compile Include="MacWorkspaceWindow.vb" />
     <None Include="Resources\Entitlements.entitlements" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Resources" />
-  </ItemGroup>
-  <ItemGroup>
     <Content Include="Resources\Info.plist" />
     <Content Include="Resources\App.icns" />
     <Xib Include="Resources\MainMenu.xib" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Resources" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\RemObjects Software\Elements\RemObjects.Elements.Toffee.targets" />
 </Project>
