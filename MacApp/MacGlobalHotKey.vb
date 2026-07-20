@@ -4,7 +4,7 @@ Imports RemObjects.Elements.System
 
 Public Delegate Sub MacGlobalHotKeyTriggered()
 
-Public Shared Function handleMacGlobalHotKeyEvent(nextHandler As EventHandlerCallRef, eventReference As EventRef, context As Ptr(Of Void)) As OSStatus
+Public Function handleMacGlobalHotKeyEvent(nextHandler As EventHandlerCallRef, eventReference As EventRef, context As Ptr(Of Void)) As OSStatus
   NSLog("Zoomer: Carbon received ⌥⌘Z")
   MacGlobalHotKey.dispatchHotKeyEvent()
   Return noErr
