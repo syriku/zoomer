@@ -1,23 +1,18 @@
-.PHONY: build test native app windows run clean
+# RemObjects Elements command placeholders.
+# Add recipes only after the corresponding workflow is implemented and verified.
+
+.PHONY: build test macapp wpfapp run-macapp run-wpfapp clean
 
 build:
-	dotnet build Zoomer.slnx
 
 test:
-	dotnet run --project tests/Zoomer.Core.Tests/Zoomer.Core.Tests.csproj
 
-native:
-	./scripts/build-native.sh
+macapp:
 
-app:
-	./scripts/build-app.sh
+wpfapp:
 
-windows:
-	dotnet publish src/Zoomer.App/Zoomer.App.csproj -c Release -f net10.0-windows10.0.19041.0 -r win-x64 --self-contained false -p:PublishSingleFile=true -p:PublishAot=false -p:PublishTrimmed=false -p:DebugType=None -o artifacts/windows/win-x64/Release
+run-macapp:
 
-run: app
-	open artifacts/app/Zoomer.app
+run-wpfapp:
 
 clean:
-	dotnet clean Zoomer.slnx
-	rm -rf artifacts
