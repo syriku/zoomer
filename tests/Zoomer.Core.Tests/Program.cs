@@ -7,6 +7,7 @@ var tests = new (string Name, Action Run)[]
     ("Transform clamps minimum", TestMinimum),
     ("Transform clamps maximum", TestMaximum),
     ("Transform applies magnification", TestMagnification),
+    ("Transform reaches preset scales", TestPresetScales),
     ("Transform rejects invalid magnification", TestInvalidMagnification),
     ("Transform translates and resets", TestTranslateReset),
     ("Transform toggles horizontal flip", TestHorizontalFlip),
@@ -64,6 +65,24 @@ static void TestMagnification()
     Equal(TransformModel.MaximumScale, model.State.Scale);
     model.ZoomByMagnification(-100, 0, 0);
     Equal(TransformModel.MinimumScale, model.State.Scale);
+}
+
+static void TestPresetScales()
+{
+    var model = new TransformModel();
+    const double anchorX = 100;
+    const double anchorY = 50;
+
+    True(model.ZoomByMagnification(1.5 - model.State.Scale, anchorX, anchorY));
+    Equal(new TransformState(1.5, -50, -25), model.State);
+
+    True(model.ZoomByMagnification(2.0 - model.State.Scale, anchorX, anchorY));
+    Equal(new TransformState(2, -100, -50), model.State);
+
+    True(model.ZoomByMagnification(0.7 - model.State.Scale, anchorX, anchorY));
+    True(Math.Abs(model.State.Scale - 0.7) < 0.0000001);
+    True(Math.Abs(model.State.OffsetX - 30) < 0.0000001);
+    True(Math.Abs(model.State.OffsetY - 15) < 0.0000001);
 }
 
 static void TestInvalidMagnification()

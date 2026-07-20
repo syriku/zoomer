@@ -212,6 +212,11 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
 @property(nonatomic, strong) NSTrackingArea *trackingArea;
 @property(nonatomic) BOOL spotlightActive;
 @property(nonatomic) NSPoint spotlightCenter;
+@property(nonatomic) BOOL laserPointerVisible;
+@property(nonatomic) NSPoint laserPointerCenter;
+@property(nonatomic) BOOL systemCursorHidden;
+- (void)hideSystemCursor;
+- (void)restoreSystemCursor;
 @end
 
 @implementation ZMRZoomView
@@ -235,6 +240,16 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
 }
 - (BOOL)acceptsFirstResponder { return YES; }
 - (BOOL)isFlipped { return NO; }
+- (void)hideSystemCursor {
+    if (self.systemCursorHidden) return;
+    [NSCursor hide];
+    self.systemCursorHidden = YES;
+}
+- (void)restoreSystemCursor {
+    if (!self.systemCursorHidden) return;
+    [NSCursor unhide];
+    self.systemCursorHidden = NO;
+}
 - (void)layout {
     [super layout];
     self.hud.frame = NSMakeRect(16, 16, 88, 36);
@@ -247,23 +262,44 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
                 NSTrackingActiveAlways | NSTrackingInVisibleRect owner:self userInfo:nil];
     [self addTrackingArea:self.trackingArea];
 }
-- (void)mouseEntered:(NSEvent *)event { [NSCursor.openHandCursor push]; }
-- (void)mouseExited:(NSEvent *)event { [NSCursor pop]; }
+- (void)mouseEntered:(NSEvent *)event {
+    [NSCursor.openHandCursor push];
+    [self hideSystemCursor];
+    self.laserPointerVisible = YES;
+    self.laserPointerCenter = [self convertPoint:event.locationInWindow fromView:nil];
+    [self setNeedsDisplay:YES];
+}
+- (void)mouseExited:(NSEvent *)event {
+    [self restoreSystemCursor];
+    [NSCursor pop];
+    self.laserPointerVisible = NO;
+    [self setNeedsDisplay:YES];
+}
 - (void)mouseMoved:(NSEvent *)event {
-    if (!self.spotlightActive) return;
-    self.spotlightCenter = [self convertPoint:event.locationInWindow fromView:nil];
+    [self hideSystemCursor];
+    NSPoint point = [self convertPoint:event.locationInWindow fromView:nil];
+    self.laserPointerVisible = YES;
+    self.laserPointerCenter = point;
+    if (self.spotlightActive) self.spotlightCenter = point;
     [self setNeedsDisplay:YES];
 }
 - (void)mouseDown:(NSEvent *)event {
+    [self hideSystemCursor];
     self.previousDragPoint = [self convertPoint:event.locationInWindow fromView:nil];
+    self.laserPointerVisible = YES;
+    self.laserPointerCenter = self.previousDragPoint;
+    [self setNeedsDisplay:YES];
     [NSCursor.closedHandCursor set];
 }
 - (void)mouseDragged:(NSEvent *)event {
+    [self hideSystemCursor];
     NSPoint point = [self convertPoint:event.locationInWindow fromView:nil];
+    self.laserPointerVisible = YES;
+    self.laserPointerCenter = point;
     if (self.spotlightActive) {
         self.spotlightCenter = point;
-        [self setNeedsDisplay:YES];
     }
+    [self setNeedsDisplay:YES];
     if (self.callbacks.pan_requested)
         self.callbacks.pan_requested(self.callbackContext, point.x - self.previousDragPoint.x,
                                      point.y - self.previousDragPoint.y);
@@ -288,7 +324,43 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
     if (self.callbacks.magnify_requested)
         self.callbacks.magnify_requested(self.callbackContext, event.magnification, anchor.x, anchor.y);
 }
+- (void)requestPresetScale:(double)scale forEvent:(NSEvent *)event {
+    if (!self.callbacks.magnify_requested) return;
+    NSPoint anchor = [self convertPoint:event.locationInWindow fromView:nil];
+    self.callbacks.magnify_requested(self.callbackContext, scale - self.scale, anchor.x, anchor.y);
+}
 - (void)keyDown:(NSEvent *)event {
+    NSEventModifierFlags modifiers = event.modifierFlags &
+        (NSEventModifierFlagCommand | NSEventModifierFlagOption |
+         NSEventModifierFlagControl | NSEventModifierFlagShift);
+    BOOL hasShortcutModifier = modifiers != 0;
+    BOOL isZero = event.keyCode == kVK_ANSI_0 || event.keyCode == kVK_ANSI_Keypad0;
+    if (!event.isARepeat && isZero &&
+        (modifiers == 0 || modifiers == NSEventModifierFlagCommand)) {
+        if (self.callbacks.reset_requested) self.callbacks.reset_requested(self.callbackContext);
+        return;
+    }
+    if (!event.isARepeat && !hasShortcutModifier) {
+        double presetScale = 0.0;
+        switch (event.keyCode) {
+            case kVK_ANSI_1:
+            case kVK_ANSI_Keypad1:
+                presetScale = 1.5;
+                break;
+            case kVK_ANSI_2:
+            case kVK_ANSI_Keypad2:
+                presetScale = 2.0;
+                break;
+            case kVK_ANSI_9:
+            case kVK_ANSI_Keypad9:
+                presetScale = 0.7;
+                break;
+        }
+        if (presetScale > 0.0) {
+            [self requestPresetScale:presetScale forEvent:event];
+            return;
+        }
+    }
     if (event.keyCode == kVK_ANSI_M) {
         if (!event.isARepeat && self.callbacks.toggle_horizontal_flip_requested)
             self.callbacks.toggle_horizontal_flip_requested(self.callbackContext);
@@ -307,10 +379,6 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
         if (self.callbacks.dismiss_requested) self.callbacks.dismiss_requested(self.callbackContext);
         return;
     }
-    if ((event.modifierFlags & NSEventModifierFlagCommand) && event.keyCode == 29) {
-        if (self.callbacks.reset_requested) self.callbacks.reset_requested(self.callbackContext);
-        return;
-    }
     [super keyDown:event];
 }
 - (void)keyUp:(NSEvent *)event {
@@ -324,6 +392,7 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
     [super keyUp:event];
 }
 - (BOOL)resignFirstResponder {
+    [self restoreSystemCursor];
     if (self.spotlightActive) {
         self.spotlightActive = NO;
         [self setNeedsDisplay:YES];
@@ -383,8 +452,31 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
                                     kCGGradientDrawsAfterEndLocation);
         CGContextRestoreGState(cg);
     }
+
+    if (self.laserPointerVisible) {
+        static const CGFloat outerRadius = 11.0;
+        static const CGFloat coreRadius = 4.0;
+        NSPoint center = self.laserPointerCenter;
+        CGContextSaveGState(cg);
+        CGContextSetFillColorWithColor(cg,
+            [NSColor colorWithCalibratedRed:1.0 green:0.08 blue:0.08 alpha:0.28].CGColor);
+        CGContextFillEllipseInRect(cg, CGRectMake(center.x - outerRadius, center.y - outerRadius,
+                                                   outerRadius * 2.0, outerRadius * 2.0));
+        CGContextSetFillColorWithColor(cg,
+            [NSColor colorWithCalibratedRed:1.0 green:0.05 blue:0.05 alpha:0.96].CGColor);
+        CGContextFillEllipseInRect(cg, CGRectMake(center.x - coreRadius, center.y - coreRadius,
+                                                   coreRadius * 2.0, coreRadius * 2.0));
+        CGContextSetStrokeColorWithColor(cg, [NSColor.whiteColor colorWithAlphaComponent:0.9].CGColor);
+        CGContextSetLineWidth(cg, 1.0);
+        CGContextStrokeEllipseInRect(cg, CGRectMake(center.x - coreRadius, center.y - coreRadius,
+                                                     coreRadius * 2.0, coreRadius * 2.0));
+        CGContextRestoreGState(cg);
+    }
 }
-- (void)dealloc { if (_image) CGImageRelease(_image); }
+- (void)dealloc {
+    [self restoreSystemCursor];
+    if (_image) CGImageRelease(_image);
+}
 @end
 
 @interface ZMRWindowBox : NSObject
@@ -394,6 +486,7 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
 @property(nonatomic, strong) id screenObserver;
 @property(nonatomic, strong) id spaceObserver;
 @property(nonatomic, strong) id keyObserver;
+@property(nonatomic, strong) id becameKeyObserver;
 @end
 @implementation ZMRWindowBox
 @end
@@ -445,10 +538,21 @@ void *zmr_window_create(void *context, zmr_window_callbacks callbacks,
     box.keyObserver = [NSNotificationCenter.defaultCenter addObserverForName:NSWindowDidResignKeyNotification
         object:window queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
         ZMRWindowBox *strongBox = weakBox;
-        if (strongBox && strongBox.view.spotlightActive) {
-            strongBox.view.spotlightActive = NO;
-            [strongBox.view setNeedsDisplay:YES];
+        if (strongBox) {
+            [strongBox.view restoreSystemCursor];
+            if (strongBox.view.spotlightActive) {
+                strongBox.view.spotlightActive = NO;
+                [strongBox.view setNeedsDisplay:YES];
+            }
         }
+    }];
+    box.becameKeyObserver = [NSNotificationCenter.defaultCenter addObserverForName:NSWindowDidBecomeKeyNotification
+        object:window queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
+        ZMRWindowBox *strongBox = weakBox;
+        if (!strongBox) return;
+        NSPoint point = [strongBox.view convertPoint:strongBox.window.mouseLocationOutsideOfEventStream
+                                           fromView:nil];
+        if (NSPointInRect(point, strongBox.view.bounds)) [strongBox.view hideSystemCursor];
     }];
     return (__bridge_retained void *)box;
 }
@@ -459,6 +563,11 @@ void zmr_window_show(void *handle) {
     [NSApplication.sharedApplication activateIgnoringOtherApps:YES];
     [box.window makeKeyAndOrderFront:nil];
     [box.window makeFirstResponder:box.view];
+    box.view.laserPointerCenter = [box.view convertPoint:box.window.mouseLocationOutsideOfEventStream
+                                                fromView:nil];
+    box.view.laserPointerVisible = NSPointInRect(box.view.laserPointerCenter, box.view.bounds);
+    if (box.view.laserPointerVisible) [box.view hideSystemCursor];
+    [box.view setNeedsDisplay:YES];
 }
 
 void zmr_window_update_transform(void *handle, double scale, double offsetX,
@@ -479,6 +588,8 @@ void zmr_window_destroy(void *handle) {
     if (box.screenObserver) [NSNotificationCenter.defaultCenter removeObserver:box.screenObserver];
     if (box.spaceObserver) [NSWorkspace.sharedWorkspace.notificationCenter removeObserver:box.spaceObserver];
     if (box.keyObserver) [NSNotificationCenter.defaultCenter removeObserver:box.keyObserver];
+    if (box.becameKeyObserver) [NSNotificationCenter.defaultCenter removeObserver:box.becameKeyObserver];
+    [box.view restoreSystemCursor];
     box.view.callbacks = (zmr_window_callbacks){0};
     [box.window close];
     box.window = nil;

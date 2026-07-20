@@ -95,6 +95,7 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
     private const int WmMouseHWheel = 0x020E;
     private const uint SwpNoOwnerZOrder = 0x0200;
     private const double SpotlightRadius = 90.0;
+    private const double LaserPointerRadius = 7.0;
     private static readonly nint HwndTopmost = new(-1);
 
     private readonly Grid _root;
@@ -103,6 +104,8 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
     private readonly TextBlock _hudText;
     private readonly RadialGradientBrush _spotlightBrush;
     private readonly System.Windows.Shapes.Rectangle _spotlight;
+    private readonly System.Windows.Shapes.Ellipse _laserPointer;
+    private readonly TranslateTransform _laserPointerTransform = new();
     private readonly MatrixTransform _imageTransform = new();
     private readonly DispatcherTimer _qualityTimer;
     private readonly DispatcherTimer _hudDelayTimer;
@@ -127,7 +130,7 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
         WindowStartupLocation = WindowStartupLocation.Manual;
         WindowStyle = WindowStyle.None;
         UseLayoutRounding = true;
-        Cursor = System.Windows.Input.Cursors.Hand;
+        Cursor = System.Windows.Input.Cursors.None;
 
         _image = new System.Windows.Controls.Image
         {
@@ -159,6 +162,19 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
             Fill = _spotlightBrush,
             IsHitTestVisible = false,
             Visibility = Visibility.Collapsed,
+        };
+        _laserPointer = new System.Windows.Shapes.Ellipse
+        {
+            Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(245, 255, 13, 13)),
+            Height = LaserPointerRadius * 2,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            IsHitTestVisible = false,
+            RenderTransform = _laserPointerTransform,
+            Stroke = System.Windows.Media.Brushes.White,
+            StrokeThickness = 1,
+            VerticalAlignment = System.Windows.VerticalAlignment.Top,
+            Visibility = Visibility.Collapsed,
+            Width = LaserPointerRadius * 2,
         };
 
         _hudText = new TextBlock
@@ -192,6 +208,7 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
         };
         _root.Children.Add(_image);
         _root.Children.Add(_spotlight);
+        _root.Children.Add(_laserPointer);
         _root.Children.Add(_hud);
         Content = _root;
 
@@ -262,6 +279,7 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
             stage = "激活窗口";
             Activate();
             Focus();
+            SetLaserPointerActive(true);
             _frame = windowsFrame;
             return WindowShowResult.Success;
         }
@@ -363,13 +381,13 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
         _dragging = true;
         _previousDragPoint = e.GetPosition(_root);
         Mouse.Capture(this);
-        Cursor = System.Windows.Input.Cursors.SizeAll;
         e.Handled = true;
     }
 
     protected override void OnMouseMove(System.Windows.Input.MouseEventArgs e)
     {
         base.OnMouseMove(e);
+        UpdateLaserPointerCenter(e.GetPosition(_root));
         if (_spotlight.Visibility == Visibility.Visible)
             UpdateSpotlightCenter(e.GetPosition(_root));
         if (!_dragging) return;
@@ -392,13 +410,25 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
         e.Handled = true;
     }
 
+    protected override void OnMouseEnter(System.Windows.Input.MouseEventArgs e)
+    {
+        base.OnMouseEnter(e);
+        SetLaserPointerActive(true);
+    }
+
+    protected override void OnMouseLeave(System.Windows.Input.MouseEventArgs e)
+    {
+        SetLaserPointerActive(false);
+        base.OnMouseLeave(e);
+    }
+
     private void EndDrag()
     {
         if (!_dragging) return;
         _dragging = false;
         if (IsMouseCaptured)
             Mouse.Capture(null);
-        Cursor = System.Windows.Input.Cursors.Hand;
+        Cursor = System.Windows.Input.Cursors.None;
     }
 
     protected override void OnPreviewMouseWheel(MouseWheelEventArgs e)
@@ -414,6 +444,8 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
 
     protected override void OnPreviewKeyDown(System.Windows.Input.KeyEventArgs e)
     {
+        if (TryHandlePresetScale(e))
+            return;
         if (e.Key == Key.M)
         {
             if (!e.IsRepeat)
@@ -436,7 +468,8 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
         if ((Keyboard.Modifiers & ModifierKeys.Control) != 0 &&
             (e.Key == Key.D0 || e.Key == Key.NumPad0))
         {
-            ResetRequested?.Invoke();
+            if (!e.IsRepeat)
+                ResetRequested?.Invoke();
             e.Handled = true;
             return;
         }
@@ -471,6 +504,55 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
         {
             _spotlight.Visibility = Visibility.Collapsed;
         }
+    }
+
+    private bool TryHandlePresetScale(System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.IsRepeat || (Keyboard.Modifiers &
+                (ModifierKeys.Alt | ModifierKeys.Control | ModifierKeys.Shift | ModifierKeys.Windows)) != 0)
+            return false;
+
+        double? scale = e.Key switch
+        {
+            Key.D0 or Key.NumPad0 => 1.0,
+            Key.D1 or Key.NumPad1 => 1.5,
+            Key.D2 or Key.NumPad2 => 2.0,
+            Key.D9 or Key.NumPad9 => 0.7,
+            _ => null,
+        };
+        if (scale is null)
+            return false;
+
+        if (scale.Value == 1.0)
+        {
+            ResetRequested?.Invoke();
+        }
+        else
+        {
+            var point = Mouse.GetPosition(_root);
+            MagnifyRequested?.Invoke(scale.Value - _transform.Scale, point.X, point.Y);
+        }
+        e.Handled = true;
+        return true;
+    }
+
+    private void SetLaserPointerActive(bool active)
+    {
+        if (active)
+        {
+            UpdateLaserPointerCenter(Mouse.GetPosition(_root));
+            _laserPointer.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            _laserPointer.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void UpdateLaserPointerCenter(System.Windows.Point point)
+    {
+        _laserPointerTransform.X = point.X - LaserPointerRadius;
+        _laserPointerTransform.Y = point.Y - LaserPointerRadius;
     }
 
     private void UpdateSpotlightCenter(System.Windows.Point point)
