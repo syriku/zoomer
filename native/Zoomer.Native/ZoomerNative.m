@@ -200,6 +200,25 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
 - (BOOL)canBecomeMainWindow { return YES; }
 @end
 
+static const CFTimeInterval ZMRLaserDrawingHoldDuration = 3.0;
+static const CFTimeInterval ZMRLaserDrawingFadeDuration = 0.8;
+static const CGFloat ZMRLaserDrawingMinimumPointDistanceSquared = 0.25;
+
+@interface ZMRLaserStroke : NSObject
+@property(nonatomic, strong) NSMutableArray<NSValue *> *points;
+@property(nonatomic) CFTimeInterval releasedAt;
+- (instancetype)initWithPoint:(NSPoint)point;
+@end
+
+@implementation ZMRLaserStroke
+- (instancetype)initWithPoint:(NSPoint)point {
+    if ((self = [super init])) {
+        _points = [NSMutableArray arrayWithObject:[NSValue valueWithPoint:point]];
+    }
+    return self;
+}
+@end
+
 @interface ZMRZoomView : NSView
 @property(nonatomic) CGImageRef image;
 @property(nonatomic) double scale;
@@ -215,8 +234,14 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
 @property(nonatomic) BOOL laserPointerVisible;
 @property(nonatomic) NSPoint laserPointerCenter;
 @property(nonatomic) BOOL systemCursorHidden;
+@property(nonatomic) BOOL laserDrawingMode;
+@property(nonatomic, strong) ZMRLaserStroke *activeLaserStroke;
+@property(nonatomic, strong) NSMutableArray<ZMRLaserStroke *> *laserStrokes;
+@property(nonatomic, strong) NSTimer *laserTrailTimer;
 - (void)hideSystemCursor;
 - (void)restoreSystemCursor;
+- (void)endActiveLaserStroke;
+- (void)clearLaserStrokes;
 @end
 
 @implementation ZMRZoomView
@@ -226,6 +251,7 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
         _scale = 1.0;
         _callbackContext = context;
         _callbacks = callbacks;
+        _laserStrokes = [NSMutableArray array];
         self.wantsLayer = YES;
         _hud = [NSTextField labelWithString:@"100%"];
         _hud.font = [NSFont monospacedDigitSystemFontOfSize:18 weight:NSFontWeightSemibold];
@@ -249,6 +275,95 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
     if (!self.systemCursorHidden) return;
     [NSCursor unhide];
     self.systemCursorHidden = NO;
+}
+- (void)beginLaserStrokeAtPoint:(NSPoint)point {
+    ZMRLaserStroke *stroke = [[ZMRLaserStroke alloc] initWithPoint:point];
+    [self.laserStrokes addObject:stroke];
+    self.activeLaserStroke = stroke;
+}
+- (NSPoint)canvasPointForViewPoint:(NSPoint)point {
+    double scale = self.scale;
+    if (scale <= 0.0) return point;
+
+    double x = (point.x - self.offset.x) / scale;
+    if (self.horizontallyFlipped) x = NSWidth(self.bounds) - x;
+    return NSMakePoint(x, (point.y - self.offset.y) / scale);
+}
+- (NSPoint)viewPointForCanvasPoint:(NSPoint)point {
+    double x = point.x;
+    if (self.horizontallyFlipped) x = NSWidth(self.bounds) - x;
+    return NSMakePoint(self.offset.x + (x * self.scale),
+                       self.offset.y + (point.y * self.scale));
+}
+- (void)appendLaserStrokePoint:(NSPoint)point {
+    ZMRLaserStroke *stroke = self.activeLaserStroke;
+    if (!stroke) return;
+
+    NSPoint previous = stroke.points.lastObject.pointValue;
+    CGFloat deltaX = point.x - previous.x;
+    CGFloat deltaY = point.y - previous.y;
+    CGFloat minimumDistanceSquared = ZMRLaserDrawingMinimumPointDistanceSquared /
+        ((CGFloat)self.scale * (CGFloat)self.scale);
+    if ((deltaX * deltaX) + (deltaY * deltaY) < minimumDistanceSquared)
+        return;
+
+    [stroke.points addObject:[NSValue valueWithPoint:point]];
+}
+- (void)startLaserTrailTimer {
+    if (self.laserTrailTimer) return;
+
+    __weak typeof(self) weakSelf = self;
+    NSTimer *timer = [NSTimer timerWithTimeInterval:(1.0 / 60.0) repeats:YES
+        block:^(NSTimer *firedTimer) {
+        ZMRZoomView *strongSelf = weakSelf;
+        if (!strongSelf) {
+            [firedTimer invalidate];
+            return;
+        }
+        [strongSelf updateLaserTrails];
+    }];
+    self.laserTrailTimer = timer;
+    [NSRunLoop.mainRunLoop addTimer:timer forMode:NSRunLoopCommonModes];
+}
+- (void)updateLaserTrails {
+    CFTimeInterval now = CACurrentMediaTime();
+    BOOL keepTimer = NO;
+    BOOL needsRedraw = NO;
+    for (NSInteger index = (NSInteger)self.laserStrokes.count - 1; index >= 0; index--) {
+        ZMRLaserStroke *stroke = self.laserStrokes[(NSUInteger)index];
+        if (stroke.releasedAt <= 0.0) continue;
+
+        CFTimeInterval elapsed = now - stroke.releasedAt;
+        if (elapsed >= ZMRLaserDrawingHoldDuration + ZMRLaserDrawingFadeDuration) {
+            [self.laserStrokes removeObjectAtIndex:(NSUInteger)index];
+            needsRedraw = YES;
+            continue;
+        }
+
+        keepTimer = YES;
+        if (elapsed >= ZMRLaserDrawingHoldDuration)
+            needsRedraw = YES;
+    }
+    if (needsRedraw) [self setNeedsDisplay:YES];
+    if (!keepTimer) {
+        [self.laserTrailTimer invalidate];
+        self.laserTrailTimer = nil;
+    }
+}
+- (void)endActiveLaserStroke {
+    ZMRLaserStroke *stroke = self.activeLaserStroke;
+    if (!stroke) return;
+
+    stroke.releasedAt = CACurrentMediaTime();
+    self.activeLaserStroke = nil;
+    [self startLaserTrailTimer];
+    [self setNeedsDisplay:YES];
+}
+- (void)clearLaserStrokes {
+    [self.laserTrailTimer invalidate];
+    self.laserTrailTimer = nil;
+    self.activeLaserStroke = nil;
+    [self.laserStrokes removeAllObjects];
 }
 - (void)layout {
     [super layout];
@@ -285,14 +400,29 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
 }
 - (void)mouseDown:(NSEvent *)event {
     [self hideSystemCursor];
+    [self endActiveLaserStroke];
     self.previousDragPoint = [self convertPoint:event.locationInWindow fromView:nil];
     self.laserPointerVisible = YES;
     self.laserPointerCenter = self.previousDragPoint;
     [self setNeedsDisplay:YES];
-    [NSCursor.closedHandCursor set];
+    if (self.laserDrawingMode) {
+        [self beginLaserStrokeAtPoint:[self canvasPointForViewPoint:self.previousDragPoint]];
+    } else {
+        [NSCursor.closedHandCursor set];
+    }
 }
 - (void)mouseDragged:(NSEvent *)event {
     [self hideSystemCursor];
+    if (self.activeLaserStroke) {
+        NSPoint point = [self convertPoint:event.locationInWindow fromView:nil];
+        [self appendLaserStrokePoint:[self canvasPointForViewPoint:point]];
+        self.laserPointerCenter = point;
+        if (self.spotlightActive) self.spotlightCenter = point;
+        self.laserPointerVisible = YES;
+        [self setNeedsDisplay:YES];
+        return;
+    }
+
     NSPoint point = [self convertPoint:event.locationInWindow fromView:nil];
     self.laserPointerVisible = YES;
     self.laserPointerCenter = point;
@@ -305,7 +435,17 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
                                      point.y - self.previousDragPoint.y);
     self.previousDragPoint = point;
 }
-- (void)mouseUp:(NSEvent *)event { [NSCursor.openHandCursor set]; }
+- (void)mouseUp:(NSEvent *)event {
+    if (self.activeLaserStroke) {
+        NSPoint point = [self convertPoint:event.locationInWindow fromView:nil];
+        [self appendLaserStrokePoint:[self canvasPointForViewPoint:point]];
+        self.laserPointerCenter = point;
+        if (self.spotlightActive) self.spotlightCenter = point;
+        [self endActiveLaserStroke];
+    } else {
+        [NSCursor.openHandCursor set];
+    }
+}
 - (void)scrollWheel:(NSEvent *)event {
     if (event.hasPreciseScrollingDeltas) {
         if (self.callbacks.pan_requested)
@@ -361,6 +501,10 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
             return;
         }
     }
+    if (!event.isARepeat && !hasShortcutModifier && event.keyCode == kVK_ANSI_D) {
+        self.laserDrawingMode = !self.laserDrawingMode;
+        return;
+    }
     if (event.keyCode == kVK_ANSI_M) {
         if (!event.isARepeat && self.callbacks.toggle_horizontal_flip_requested)
             self.callbacks.toggle_horizontal_flip_requested(self.callbackContext);
@@ -393,6 +537,7 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
 }
 - (BOOL)resignFirstResponder {
     [self restoreSystemCursor];
+    [self endActiveLaserStroke];
     if (self.spotlightActive) {
         self.spotlightActive = NO;
         [self setNeedsDisplay:YES];
@@ -411,6 +556,67 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
         animation.duration = 0.2;
         self.hud.animator.alphaValue = 0.0;
     } completionHandler:nil];
+}
+- (void)drawLaserStrokesInContext:(CGContextRef)context {
+    CFTimeInterval now = CACurrentMediaTime();
+    CGFloat drawingScale = (CGFloat)self.scale;
+    NSRect destination = NSMakeRect(self.offset.x, self.offset.y,
+                                    NSWidth(self.bounds) * drawingScale,
+                                    NSHeight(self.bounds) * drawingScale);
+    CGContextSaveGState(context);
+    CGContextClipToRect(context, NSRectToCGRect(destination));
+    CGContextSetLineCap(context, kCGLineCapRound);
+    CGContextSetLineJoin(context, kCGLineJoinRound);
+    for (ZMRLaserStroke *stroke in self.laserStrokes) {
+        NSArray<NSValue *> *points = stroke.points;
+        if (points.count == 0) continue;
+
+        CGFloat opacity = 1.0;
+        if (stroke.releasedAt > 0.0) {
+            CFTimeInterval elapsed = now - stroke.releasedAt;
+            if (elapsed > ZMRLaserDrawingHoldDuration) {
+                opacity = MAX(0.0, 1.0 - ((elapsed - ZMRLaserDrawingHoldDuration) /
+                                          ZMRLaserDrawingFadeDuration));
+            }
+        }
+        if (opacity <= 0.0) continue;
+
+        if (points.count == 1) {
+            NSPoint point = [self viewPointForCanvasPoint:points.firstObject.pointValue];
+            CGContextSetFillColorWithColor(context,
+                [NSColor colorWithCalibratedRed:1.0 green:0.08 blue:0.08 alpha:0.28 * opacity].CGColor);
+            CGContextFillEllipseInRect(context, CGRectMake(point.x - (3.5 * drawingScale),
+                                                           point.y - (3.5 * drawingScale),
+                                                           7.0 * drawingScale, 7.0 * drawingScale));
+            CGContextSetFillColorWithColor(context,
+                [NSColor colorWithCalibratedRed:1.0 green:0.05 blue:0.05 alpha:0.96 * opacity].CGColor);
+            CGContextFillEllipseInRect(context, CGRectMake(point.x - (1.75 * drawingScale),
+                                                           point.y - (1.75 * drawingScale),
+                                                           3.5 * drawingScale, 3.5 * drawingScale));
+            continue;
+        }
+
+        CGMutablePathRef path = CGPathCreateMutable();
+        NSPoint first = [self viewPointForCanvasPoint:points.firstObject.pointValue];
+        CGPathMoveToPoint(path, NULL, first.x, first.y);
+        for (NSUInteger index = 1; index < points.count; index++) {
+            NSPoint point = [self viewPointForCanvasPoint:points[index].pointValue];
+            CGPathAddLineToPoint(path, NULL, point.x, point.y);
+        }
+
+        CGContextAddPath(context, path);
+        CGContextSetStrokeColorWithColor(context,
+            [NSColor colorWithCalibratedRed:1.0 green:0.08 blue:0.08 alpha:0.28 * opacity].CGColor);
+        CGContextSetLineWidth(context, 7.0 * drawingScale);
+        CGContextStrokePath(context);
+        CGContextAddPath(context, path);
+        CGContextSetStrokeColorWithColor(context,
+            [NSColor colorWithCalibratedRed:1.0 green:0.05 blue:0.05 alpha:0.96 * opacity].CGColor);
+        CGContextSetLineWidth(context, 3.5 * drawingScale);
+        CGContextStrokePath(context);
+        CGPathRelease(path);
+    }
+    CGContextRestoreGState(context);
 }
 - (void)drawRect:(NSRect)dirtyRect {
     [NSColor.blackColor setFill];
@@ -453,6 +659,8 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
         CGContextRestoreGState(cg);
     }
 
+    [self drawLaserStrokesInContext:cg];
+
     if (self.laserPointerVisible) {
         static const CGFloat outerRadius = 11.0;
         static const CGFloat coreRadius = 4.0;
@@ -474,6 +682,7 @@ void zmr_image_release(void *image) { if (image) CGImageRelease((CGImageRef)imag
     }
 }
 - (void)dealloc {
+    [self clearLaserStrokes];
     [self restoreSystemCursor];
     if (_image) CGImageRelease(_image);
 }
@@ -540,6 +749,7 @@ void *zmr_window_create(void *context, zmr_window_callbacks callbacks,
         ZMRWindowBox *strongBox = weakBox;
         if (strongBox) {
             [strongBox.view restoreSystemCursor];
+            [strongBox.view endActiveLaserStroke];
             if (strongBox.view.spotlightActive) {
                 strongBox.view.spotlightActive = NO;
                 [strongBox.view setNeedsDisplay:YES];
@@ -590,6 +800,7 @@ void zmr_window_destroy(void *handle) {
     if (box.keyObserver) [NSNotificationCenter.defaultCenter removeObserver:box.keyObserver];
     if (box.becameKeyObserver) [NSNotificationCenter.defaultCenter removeObserver:box.becameKeyObserver];
     [box.view restoreSystemCursor];
+    [box.view clearLaserStrokes];
     box.view.callbacks = (zmr_window_callbacks){0};
     [box.window close];
     box.window = nil;

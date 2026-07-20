@@ -96,6 +96,9 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
     private const uint SwpNoOwnerZOrder = 0x0200;
     private const double SpotlightRadius = 90.0;
     private const double LaserPointerRadius = 7.0;
+    private const double LaserDrawingHoldDurationSeconds = 3.0;
+    private const double LaserDrawingFadeDurationSeconds = 0.8;
+    private const double LaserDrawingMinimumPointDistanceSquared = 0.25;
     private static readonly nint HwndTopmost = new(-1);
 
     private readonly Grid _root;
@@ -104,7 +107,9 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
     private readonly TextBlock _hudText;
     private readonly RadialGradientBrush _spotlightBrush;
     private readonly System.Windows.Shapes.Rectangle _spotlight;
+    private readonly Canvas _laserDrawingLayer;
     private readonly System.Windows.Shapes.Ellipse _laserPointer;
+    private readonly List<System.Windows.Shapes.Polyline> _laserDrawings = [];
     private readonly TranslateTransform _laserPointerTransform = new();
     private readonly MatrixTransform _imageTransform = new();
     private readonly DispatcherTimer _qualityTimer;
@@ -114,7 +119,9 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
     private string? _displayId;
     private Drawing.Rectangle _targetBounds;
     private System.Windows.Point _previousDragPoint;
+    private System.Windows.Shapes.Polyline? _activeLaserDrawing;
     private bool _dragging;
+    private bool _laserDrawingMode;
     private bool _monitoringDisplays;
     private bool _closed;
     private bool _disposed;
@@ -163,6 +170,13 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
             IsHitTestVisible = false,
             Visibility = Visibility.Collapsed,
         };
+        _laserDrawingLayer = new Canvas
+        {
+            ClipToBounds = true,
+            IsHitTestVisible = false,
+            RenderTransform = _imageTransform,
+            RenderTransformOrigin = new System.Windows.Point(0, 0),
+        };
         _laserPointer = new System.Windows.Shapes.Ellipse
         {
             Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(245, 255, 13, 13)),
@@ -208,6 +222,7 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
         };
         _root.Children.Add(_image);
         _root.Children.Add(_spotlight);
+        _root.Children.Add(_laserDrawingLayer);
         _root.Children.Add(_laserPointer);
         _root.Children.Add(_hud);
         Content = _root;
@@ -309,7 +324,8 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
         _image.Source = null;
         _qualityTimer.Stop();
         _hudDelayTimer.Stop();
-        EndDrag();
+        AbortMouseInteraction();
+        ClearLaserDrawings();
         if (!_closed)
         {
             try
@@ -378,26 +394,48 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonDown(e);
-        _dragging = true;
-        _previousDragPoint = e.GetPosition(_root);
+        if (_activeLaserDrawing is not null || _dragging)
+            EndMouseInteraction();
+        var point = e.GetPosition(_root);
+        UpdateLaserPointerCenter(point);
         Mouse.Capture(this);
+        if (_laserDrawingMode)
+            BeginLaserDrawing(ToCanvasPoint(point));
+        else
+        {
+            _dragging = true;
+            _previousDragPoint = point;
+        }
         e.Handled = true;
     }
 
     protected override void OnMouseMove(System.Windows.Input.MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        UpdateLaserPointerCenter(e.GetPosition(_root));
+        var point = e.GetPosition(_root);
+        UpdateLaserPointerCenter(point);
         if (_spotlight.Visibility == Visibility.Visible)
-            UpdateSpotlightCenter(e.GetPosition(_root));
+            UpdateSpotlightCenter(point);
+        if (_activeLaserDrawing is not null)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed)
+            {
+                EndMouseInteraction();
+                e.Handled = true;
+                return;
+            }
+
+            AppendLaserDrawing(ToCanvasPoint(point));
+            e.Handled = true;
+            return;
+        }
         if (!_dragging) return;
         if (e.LeftButton != MouseButtonState.Pressed)
         {
-            EndDrag();
+            EndMouseInteraction();
             return;
         }
 
-        var point = e.GetPosition(_root);
         PanRequested?.Invoke(point.X - _previousDragPoint.X, point.Y - _previousDragPoint.Y);
         _previousDragPoint = point;
         e.Handled = true;
@@ -406,7 +444,13 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonUp(e);
-        EndDrag();
+        var point = e.GetPosition(_root);
+        UpdateLaserPointerCenter(point);
+        if (_spotlight.Visibility == Visibility.Visible)
+            UpdateSpotlightCenter(point);
+        if (_activeLaserDrawing is not null)
+            AppendLaserDrawing(ToCanvasPoint(point));
+        EndMouseInteraction();
         e.Handled = true;
     }
 
@@ -422,13 +466,104 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
         base.OnMouseLeave(e);
     }
 
-    private void EndDrag()
+    protected override void OnLostMouseCapture(System.Windows.Input.MouseEventArgs e)
     {
-        if (!_dragging) return;
+        base.OnLostMouseCapture(e);
+        if (_activeLaserDrawing is not null || _dragging)
+            EndMouseInteraction();
+    }
+
+    private void BeginLaserDrawing(System.Windows.Point point)
+    {
+        var drawing = new System.Windows.Shapes.Polyline
+        {
+            IsHitTestVisible = false,
+            Stroke = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, 255, 13, 13)),
+            StrokeEndLineCap = PenLineCap.Round,
+            StrokeLineJoin = PenLineJoin.Round,
+            StrokeStartLineCap = PenLineCap.Round,
+            StrokeThickness = 3.5,
+        };
+        drawing.Points.Add(point);
+        _laserDrawingLayer.Children.Add(drawing);
+        _laserDrawings.Add(drawing);
+        _activeLaserDrawing = drawing;
+    }
+
+    private void AppendLaserDrawing(System.Windows.Point point)
+    {
+        var drawing = _activeLaserDrawing;
+        if (drawing is null) return;
+
+        var previous = drawing.Points[^1];
+        var deltaX = point.X - previous.X;
+        var deltaY = point.Y - previous.Y;
+        var minimumDistanceSquared = LaserDrawingMinimumPointDistanceSquared /
+            (_transform.Scale * _transform.Scale);
+        if ((deltaX * deltaX) + (deltaY * deltaY) < minimumDistanceSquared)
+            return;
+
+        drawing.Points.Add(point);
+    }
+
+    private System.Windows.Point ToCanvasPoint(System.Windows.Point point)
+    {
+        var rootFromCanvas = _imageTransform.Matrix;
+        if (!rootFromCanvas.HasInverse) return point;
+        rootFromCanvas.Invert();
+        return rootFromCanvas.Transform(point);
+    }
+
+    private void EndMouseInteraction()
+    {
+        EndActiveLaserDrawing();
         _dragging = false;
         if (IsMouseCaptured)
             Mouse.Capture(null);
         Cursor = System.Windows.Input.Cursors.None;
+    }
+
+    private void EndActiveLaserDrawing()
+    {
+        var drawing = _activeLaserDrawing;
+        if (drawing is null) return;
+
+        _activeLaserDrawing = null;
+        var fade = new DoubleAnimation
+        {
+            BeginTime = TimeSpan.FromSeconds(LaserDrawingHoldDurationSeconds),
+            Duration = TimeSpan.FromSeconds(LaserDrawingFadeDurationSeconds),
+            FillBehavior = FillBehavior.HoldEnd,
+            From = 1,
+            To = 0,
+        };
+        fade.Completed += (_, _) => RemoveLaserDrawing(drawing);
+        drawing.BeginAnimation(OpacityProperty, fade);
+    }
+
+    private void AbortMouseInteraction()
+    {
+        _activeLaserDrawing = null;
+        _dragging = false;
+        if (IsMouseCaptured)
+            Mouse.Capture(null);
+        Cursor = System.Windows.Input.Cursors.None;
+    }
+
+    private void RemoveLaserDrawing(System.Windows.Shapes.Polyline drawing)
+    {
+        if (!_laserDrawings.Remove(drawing)) return;
+        drawing.BeginAnimation(OpacityProperty, null);
+        _laserDrawingLayer.Children.Remove(drawing);
+    }
+
+    private void ClearLaserDrawings()
+    {
+        _activeLaserDrawing = null;
+        foreach (var drawing in _laserDrawings)
+            drawing.BeginAnimation(OpacityProperty, null);
+        _laserDrawings.Clear();
+        _laserDrawingLayer.Children.Clear();
     }
 
     protected override void OnPreviewMouseWheel(MouseWheelEventArgs e)
@@ -446,6 +581,13 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
     {
         if (TryHandlePresetScale(e))
             return;
+        if (e.Key == Key.D && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            if (!e.IsRepeat)
+                _laserDrawingMode = !_laserDrawingMode;
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.M)
         {
             if (!e.IsRepeat)
@@ -490,6 +632,7 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
     protected override void OnDeactivated(EventArgs e)
     {
         SetSpotlightActive(false);
+        EndMouseInteraction();
         base.OnDeactivated(e);
     }
 
@@ -608,7 +751,8 @@ internal sealed class WindowsWorkspaceWindow : Window, INativeWorkspaceWindow
         _image.Source = null;
         _frame?.Dispose();
         _frame = null;
-        EndDrag();
+        AbortMouseInteraction();
+        ClearLaserDrawings();
         if (!_closed)
         {
             Close();
