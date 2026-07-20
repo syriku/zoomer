@@ -26,14 +26,27 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Cocoa" />
+    <Reference Include="CoreGraphics" />
+    <Reference Include="QuartzCore" />
+    <Reference Include="ScreenCaptureKit" />
     <Reference Include="rtl" />
     <Reference Include="libToffee" />
     <Reference Include="libElements" />
     <Reference Include="libMercury" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="Shared">
+      <Project>{14908247-56B9-47D8-81F5-CD1A6D1C3137}</Project>
+      <ProjectFile>..\Shared\Shared.elements</ProjectFile>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="AppDelegate.vb" />
-    <Compile Include="MainWindowController.vb" />
+    <Compile Include="MacWorkspaceFrame.vb" />
+    <Compile Include="MacWorkspaceImageView.vb" />
+    <Compile Include="MacWorkspacePlatformActual.vb" />
+    <Compile Include="MacWorkspaceSurfaceActual.vb" />
+    <Compile Include="MacWorkspaceWindow.vb" />
     <None Include="Resources\Entitlements.entitlements" />
   </ItemGroup>
   <ItemGroup>
@@ -42,9 +55,6 @@
   <ItemGroup>
     <Content Include="Resources\Info.plist" />
     <Content Include="Resources\App.icns" />
-    <Xib Include="MainWindowController.xib">
-      <DependentUpon>MainWindowController.vb</DependentUpon>
-    </Xib>
     <Xib Include="Resources\MainMenu.xib" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\RemObjects Software\Elements\RemObjects.Elements.Toffee.targets" />

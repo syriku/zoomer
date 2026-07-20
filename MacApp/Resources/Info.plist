@@ -18,5 +18,7 @@
 		<string>MainMenu</string>
 		<key>NSPrincipalClass</key>
 		<string>NSApplication</string>
+		<key>NSScreenCaptureUsageDescription</key>
+		<string>Zoomer 需要屏幕录制权限以截取当前显示器并进入工作模式。</string>
 	</dict>
 </plist>

@@ -13,12 +13,21 @@
 ## Architecture Boundaries
 
 - Treat `../zoomer` (the `main` worktree) as the behavioral reference. Port behavior deliberately instead of copying its C# and C ABI structure into the Elements solution.
-- `Shared` owns platform-independent workspace state, zoom/pan/flip transforms, preset/reset behavior, drawing state, and interfaces for capture, display selection, hotkeys, and workspace windows.
+- `Shared` owns platform-independent workspace state, zoom/pan/flip transforms, preset/reset behavior, drawing state, and the public workspace contract. Its API is intentionally not a mechanical port of the old C# service interfaces.
+- Model platform-specific code as a Kotlin Multiplatform-style expect/actual boundary: `Shared` declares the `IWorkspacePlatformActual` and `IWorkspaceSurfaceActual` contracts plus `WorkspaceActuals.registerPlatformActual(...)`; each application registers exactly one platform actual during startup before creating a `WorkspaceSession`.
+- Keep app lifecycle, menus, status UI, global shortcuts, settings navigation, display discovery, capture implementation, and native rendering in the application project. `Shared` must not acquire a Cocoa, WPF, or other platform reference to provide those features.
 - `MacApp` owns the macOS lifecycle, menus, global shortcut, permissions, display discovery, ScreenCaptureKit capture, AppKit window/view rendering, input, cursor handling, packaging, signing, and notarization.
 - `WPFApp` owns the Windows lifecycle, tray UI, global shortcut, screen capture, WPF rendering and input, cursor handling, packaging, and Windows-specific error reporting.
 - Preserve capture ownership explicitly: document which layer owns a captured frame before and after a successful window update, and release it on stale, failed, and closed paths.
 - Marshal macOS UI and capture callbacks onto the main queue. Keep WPF UI work on its dispatcher thread.
 - User-facing UI, status, and error text, as well as the README, use Simplified Chinese.
+
+## Mercury Source Conventions
+
+- Every `.vb` source file must declare an explicit `Namespace`; never rely on Mercury's implicit `RootNamespace` placement. Remember that a declared Mercury namespace is prefixed by the project `RootNamespace` unless it starts with `Global.`.
+- Use Mercury multi-part method names for every API with two or more parameters in every project, not only `MacApp`. Preserve semantic parameter labels at declaration and call sites, for example `Sub presentFrame(frame As IWorkspaceFrame, onDisplay display As WorkspaceDisplay)` and `surface.presentFrame(frame, onDisplay: display)`.
+- Prefer selector-shaped public APIs such as `captureDisplayWithRequestId(requestId, completion: completion)` and `renderTransform(transform, showHud: showHud)`. Do not replace their labels with positional-only overloads.
+- Keep public shared contract types in `Shared.Core`; Mac-specific implementations belong in an explicit namespace under the `MacApp` root namespace.
 
 ## Commands and Verification
 
