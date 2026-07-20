@@ -3,7 +3,7 @@
 ## Technology Stack
 
 - This branch is a rewrite of `main` using RemObjects Elements. Use Mercury (`.vb`) for all new source code; do not reintroduce the C# projects or the Objective-C native bridge from `main`.
-- Use Elements project and solution files (`.elements` and `Zoomer.sln`). Fire is the primary macOS IDE, Water or Visual Studio with Elements is used on Windows, and EBuild is the command-line build system.
+- Use Elements project and solution files (`.elements` and `Zoomer.sln`). Fire is the primary macOS IDE, and Water or Visual Studio with Elements is used on Windows.
 - `MacApp` targets Cocoa through the Toffee backend. Implement the macOS application layer and the responsibilities of the former `native/Zoomer.Native` library directly in Mercury with Cocoa frameworks.
 - `WPFApp` is the Windows application layer and targets WPF through the Echoes/.NET backend. The scaffold is currently named `WPFApplication`; rename it to `WPFApp` when implementation work begins.
 - `Shared` replaces the former `Zoomer.Core`. Keep reusable state, transforms, controller flow, and platform contracts there. It must not depend on Cocoa, WPF, or other platform UI APIs.
@@ -29,12 +29,9 @@
 - Prefer selector-shaped public APIs such as `captureDisplayWithRequestId(requestId, completion: completion)` and `renderTransform(transform, showHud: showHud)`. Do not replace their labels with positional-only overloads.
 - Keep public shared contract types in `Shared.Core`; Mac-specific implementations belong in an explicit namespace under the `MacApp` root namespace.
 
-## Commands and Verification
+## Build and Verification
 
-- The root `Makefile` currently contains command names only. Its targets are placeholders and must not be treated as successful verification until their recipes are implemented.
-- The intended command surface is `make build`, `make test`, `make macapp`, `make wpfapp`, `make run-macapp`, `make run-wpfapp`, and `make clean`.
-- When the external Elements compiler is installed, use `ebuild Zoomer.sln` as the starting point for manual solution builds. A command-line compiler is separate from the compiler bundled with Fire on macOS.
-- Before implementing a Make target, copy the relevant EBuild invocation from the Fire or Water build log and verify it on the target operating system.
+- Build, run, and package `MacApp` with Fire on macOS. Build and run `WPFApp` with Water or Visual Studio with Elements on Windows.
 - Shared changes require tests for the shared behavior plus builds of both consumers. macOS behavior must be validated on macOS; WPF runtime behavior must be validated on Windows.
 - There is no migrated test project yet. Add one before claiming functional parity with `main`.
 
