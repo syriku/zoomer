@@ -6,6 +6,7 @@
     <RootNamespace>Shared</RootNamespace>
     <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
     <DefaultUses>RemObjects.Elements.RTL</DefaultUses>
+    <DeploymentTargetVersion>26.0</DeploymentTargetVersion>
     <Mode>Toffee</Mode>
     <SDK>macOS</SDK>
   </PropertyGroup>
