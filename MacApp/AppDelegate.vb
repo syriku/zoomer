@@ -1,4 +1,5 @@
 Imports AppKit
+Imports Carbon.HIToolbox
 Imports Foundation
 Imports [Shared].Core
 
@@ -15,6 +16,7 @@ Namespace Application
     Private _permissionItem As NSMenuItem
     Private _statusTextItem As NSMenuItem
     Private _globalHotKey As MacGlobalHotKey
+    Private _hotKeyRegistrationStatus As OSStatus
 
     Public Sub applicationDidFinishLaunching(notification As NSNotification)
       NSApplication.sharedApplication().setActivationPolicy(NSApplicationActivationPolicy.Accessory)
@@ -70,17 +72,19 @@ Namespace Application
       _globalHotKey = New MacGlobalHotKey()
       _globalHotKey.Triggered = AddressOf globalHotKeyTriggered
       If Not _globalHotKey.registerHotKey() Then
+        _hotKeyRegistrationStatus = _globalHotKey.RegistrationStatus()
         _globalHotKey.Triggered = Null
         _globalHotKey = Null
-        _statusTextItem.title = "无法注册快捷键 ⌥⌘Z"
       End If
     End Sub
 
     Private Sub globalHotKeyTriggered()
       If _workspaceSession Is Null Then
+        NSLog("Zoomer: ⌥⌘Z ignored because the workspace session is unavailable")
         Exit Sub
       End If
 
+      NSLog("Zoomer: ⌥⌘Z reached AppDelegate in state %d", _workspaceSession.State())
       If _workspaceSession.State() = WorkspaceState.Idle Then
         _workspaceSession.requestPresentation()
       End If
@@ -97,7 +101,11 @@ Namespace Application
       End If
 
       _presentItem.enabled = _workspaceSession.State() = WorkspaceState.Idle
-      _statusTextItem.title = _workspaceSession.StatusText()
+      If _globalHotKey Is Null Then
+        _statusTextItem.title = NSString.stringWithFormat("无法注册快捷键 ⌥⌘Z（%d）", _hotKeyRegistrationStatus)
+      Else
+        _statusTextItem.title = _workspaceSession.StatusText()
+      End If
 
       If _platformActual.screenRecordingPermission() = WorkspacePermissionState.Granted Then
         _permissionItem.title = "屏幕录制权限：已授权"

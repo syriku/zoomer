@@ -125,24 +125,22 @@ Namespace Application
               Exit Sub
             End If
 
-            Dim retainedImage As CGImageRef = CGImageRetain(image)
-            NSOperationQueue.mainQueue().addOperationWithBlock(Sub()
-              Try
-                Dim nativeImage As NSImage = New NSImage(CGImage: retainedImage, size: NSMakeSize(0.0, 0.0))
-                If nativeImage Is Null Then
-                  completeFailureWithRequestId(requestId,
-                    code: WorkspaceFailureCode.CaptureFailed,
-                    message: "无法创建截图图像",
-                    completion: completion)
-                  Exit Sub
-                End If
+            ' NSImage retains the CGImage. Keep the capture in ARC-managed Objective-C
+            ' objects before moving the result to the main queue; do not manually retain
+            ' and release a Core Graphics image across the asynchronous handoff.
+            Dim nativeImage As NSImage = New NSImage(CGImage: image, size: NSMakeSize(0.0, 0.0))
+            If nativeImage Is Null Then
+              completeFailureWithRequestId(requestId,
+                code: WorkspaceFailureCode.CaptureFailed,
+                message: "无法创建截图图像",
+                completion: completion)
+              Exit Sub
+            End If
 
-                Dim frame As MacWorkspaceFrame = New MacWorkspaceFrame(nativeImage)
-                completeCaptureWithCompletion(completion,
-                  result: WorkspaceCaptureResult.succeededWithRequestId(requestId, frame: frame, onDisplay: display))
-              Finally
-                CGImageRelease(retainedImage)
-              End Try
+            NSOperationQueue.mainQueue().addOperationWithBlock(Sub()
+              Dim frame As MacWorkspaceFrame = New MacWorkspaceFrame(nativeImage)
+              completeCaptureWithCompletion(completion,
+                result: WorkspaceCaptureResult.succeededWithRequestId(requestId, frame: frame, onDisplay: display))
             End Sub)
           End Sub)
       End Sub)

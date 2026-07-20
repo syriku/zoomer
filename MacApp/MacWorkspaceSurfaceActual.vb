@@ -61,6 +61,10 @@ Namespace Application
           backing: NSBackingStoreType.Buffered,
           defer: False,
           screen: targetScreen)
+        ' The surface keeps the window in a strong ARC field until dismissal has
+        ' completed. Match the original Cocoa implementation and prevent close()
+        ' from scheduling a second ownership release for that same window.
+        newWindow.releasedWhenClosed = False
         newWindow.backgroundColor = NSColor.blackColor
         newWindow.opaque = True
         newWindow.acceptsMouseMovedEvents = True
@@ -143,6 +147,7 @@ Namespace Application
       End If
 
       _isDismissing = True
+      NSLog("Zoomer: beginning workspace window dismissal")
       stopObservingDisplayChanges()
       stopHudFadeTimer()
 
@@ -152,13 +157,16 @@ Namespace Application
       End If
 
       If _window IsNot Null Then
+        NSLog("Zoomer: closing workspace window")
         _window.orderOut(Null)
         _window.close()
+        NSLog("Zoomer: workspace window close returned")
       End If
 
       releaseOwnedFrame()
       clearPresentationWithoutReleasingFrame()
       _isDismissing = False
+      NSLog("Zoomer: workspace dismissal completed")
     End Sub
 
     Private Sub workspaceCommandRequested(command As WorkspaceCommand)
