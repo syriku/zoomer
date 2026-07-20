@@ -24,10 +24,10 @@
 
 ## Mercury Source Conventions
 
-- Every `.vb` source file must declare an explicit `Namespace`; never rely on Mercury's implicit `RootNamespace` placement. Remember that a declared Mercury namespace is prefixed by the project `RootNamespace` unless it starts with `Global.`.
+- Set each project's root namespace with its `.elements` `RootNamespace` property. Only use `Namespace` and `End Namespace` in `.vb` source files when a nested namespace is explicitly required; otherwise, rely on the project root namespace. `MacApp` and `WPFApplication` use their project names; `Shared` uses `Core` because `Shared` is a Mercury keyword.
 - Use Mercury multi-part method names for every API with two or more parameters in every project, not only `MacApp`. Preserve semantic parameter labels at declaration and call sites, for example `Sub presentFrame(frame As IWorkspaceFrame, onDisplay display As WorkspaceDisplay)` and `surface.presentFrame(frame, onDisplay: display)`.
 - Prefer selector-shaped public APIs such as `captureDisplayWithRequestId(requestId, completion: completion)` and `renderTransform(transform, showHud: showHud)`. Do not replace their labels with positional-only overloads.
-- Keep public shared contract types in `Shared.Core`; Mac-specific implementations belong in an explicit namespace under the `MacApp` root namespace.
+- Keep public shared contract types in `Core`; Mac-specific implementations belong directly under the `MacApp` root namespace unless a nested namespace is explicitly required.
 
 ## Build and Verification
 

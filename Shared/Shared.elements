@@ -3,7 +3,7 @@
   <PropertyGroup>
     <ProjectGuid>{14908247-56B9-47D8-81F5-CD1A6D1C3137}</ProjectGuid>
     <OutputType>StaticLibrary</OutputType>
-    <RootNamespace>Shared</RootNamespace>
+    <RootNamespace>Core</RootNamespace>
     <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
     <DefaultUses>RemObjects.Elements.RTL</DefaultUses>
     <DeploymentTargetVersion>26.0</DeploymentTargetVersion>
