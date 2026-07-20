@@ -24,3 +24,8 @@
 - Shared/core changes: `make build` and `make test`.
 - macOS bridge changes: also run `make native`; packaging, architecture, rpath, or signing changes require `make app`.
 - `make build` cross-compiles the Windows target on macOS because `EnableWindowsTargeting` is set, but it does not validate Windows runtime behavior.
+
+## Commit Messages
+
+- Write commit subjects in English, matching the repository's existing concise imperative style (for example, `Add center and reset shortcuts`).
+- Start with a capitalized verb, omit a trailing period, and do not use Conventional Commits prefixes unless the repository adopts them consistently.
