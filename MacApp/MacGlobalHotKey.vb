@@ -4,10 +4,7 @@ Imports RemObjects.Elements.System
 
 Public Delegate Sub MacGlobalHotKeyTriggered()
 
-<FunctionPointer>
-  Private Delegate Function CarbonHotKeyEventHandler(nextHandler As EventHandlerCallRef, eventReference As EventRef, context As Ptr(Of Void)) As OSStatus
-
-Public Function handleMacGlobalHotKeyEvent(nextHandler As EventHandlerCallRef, eventReference eventReference As EventRef, context context As Ptr(Of Void)) As OSStatus
+Public Shared Function handleMacGlobalHotKeyEvent(nextHandler As EventHandlerCallRef, eventReference As EventRef, context As Ptr(Of Void)) As OSStatus
   NSLog("Zoomer: Carbon received ⌥⌘Z")
   MacGlobalHotKey.dispatchHotKeyEvent()
   Return noErr
@@ -22,7 +19,7 @@ Public Class MacGlobalHotKey
 
   Private _hotKey As EventHotKeyRef
   Private _eventHandler As EventHandlerRef
-  Private _eventHandlerCallback As CarbonHotKeyEventHandler
+  Private _eventHandlerCallback As EventHandlerUPP
   Private _registrationStatus As OSStatus = noErr
 
   Public Property Triggered As MacGlobalHotKeyTriggered
@@ -41,7 +38,9 @@ Public Class MacGlobalHotKey
     Dim eventType As EventTypeSpec
     eventType.eventClass = kEventClassKeyboard
     eventType.eventKind = kEventHotKeyPressed
-    Dim eventTarget As EventTargetRef = GetEventDispatcherTarget()
+    ' NSApplication owns and drives the application event target. The dispatcher
+    ' target is intended for applications that dispatch Carbon events themselves.
+    Dim eventTarget As EventTargetRef = GetApplicationEventTarget()
     If Not assigned(eventTarget) Then
       _registrationStatus = -1
       Return False
@@ -53,6 +52,8 @@ Public Class MacGlobalHotKey
       Return False
     End If
 
+    ' InstallApplicationEventHandler is a C macro and is not exported by the
+    ' Elements SDK; this is its exact expansion.
     Dim installStatus As OSStatus = Carbon.HIToolbox.InstallEventHandler(eventTarget,
     _eventHandlerCallback,
     1,
@@ -110,7 +111,9 @@ Public Class MacGlobalHotKey
     Dim registration As MacGlobalHotKey = _activeRegistration
     If registration IsNot Null Then
       NSLog("Zoomer: dispatching ⌥⌘Z")
-      registration.notifyTriggered()
+      NSOperationQueue.mainQueue().addOperationWithBlock(Sub()
+        registration.notifyTriggered()
+      End Sub)
     Else
       NSLog("Zoomer: ⌥⌘Z arrived without an active registration")
     End If
