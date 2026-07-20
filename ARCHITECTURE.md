@@ -56,6 +56,8 @@ dismissPresentation()
 4. `presentFrame` 成功后，surface 独占帧并负责在关闭时释放；失败时 Shared 释放帧并回到空闲状态。
 5. surface 的关闭、显示器断开和输入事件都回到 Shared 会话；会话只更新共享状态，并通过 `renderTransform` 让 surface 重绘。
 
+macOS 截图尺寸使用显示器逻辑点尺寸乘以 `backingScaleFactor`，并显式传给 `SCStreamConfiguration`；否则 ScreenCaptureKit 的默认配置会在 Retina 显示器上产生逻辑尺寸截图。工作区视图始终保持为视口大小，缩放、偏移和翻转只参与绘制；鼠标、滚轮和捏合事件因此始终以稳定的视口坐标作为 Shared 变换锚点。
+
 `IWorkspaceFrame.releaseFrame()` 是显式所有权转移点，不能依赖 ARC、GC 或平台图像对象的隐式生命周期。MacApp 必须保证其 capture completion、窗口操作和 surface 事件发生在主线程；Shared 不引入平台调度器。
 
 ## 命名规则

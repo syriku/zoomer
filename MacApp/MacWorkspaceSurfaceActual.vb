@@ -21,6 +21,7 @@ Namespace Application
     Private _targetDisplayId As String
     Private _screenObserver As NSObject
     Private _windowCloseObserver As NSObject
+    Private _hudFadeTimer As NSTimer
     Private _isDismissing As Boolean
     Private _didRequestDisplayDismissal As Boolean
 
@@ -67,13 +68,18 @@ Namespace Application
         Dim contentFrame As NSRect = NSMakeRect(0.0, 0.0, screenFrame.size.width, screenFrame.size.height)
         Dim contentView As NSView = New NSView(Frame: contentFrame)
         Dim imageView As MacWorkspaceImageView = New MacWorkspaceImageView(Frame: contentFrame)
-        imageView.image = image
-        imageView.imageScaling = NSImageScaling.ImageScaleAxesIndependently
+        imageView.Image = image
         imageView.wantsLayer = True
         contentView.addSubview(imageView)
 
         Dim hudLabel As NSTextField = NSTextField.labelWithString("100%")
-        hudLabel.frame = NSMakeRect(16.0, 16.0, 96.0, 28.0)
+        hudLabel.frame = NSMakeRect(16.0, 16.0, 88.0, 36.0)
+        hudLabel.font = NSFont.monospacedDigitSystemFontOfSize(18.0, weight: NSFontWeightSemibold)
+        hudLabel.textColor = NSColor.whiteColor
+        hudLabel.alignment = NSTextAlignment.Center
+        hudLabel.wantsLayer = True
+        hudLabel.layer.backgroundColor = NSColor.colorWithWhite(0.0, alpha: 0.72).CGColor
+        hudLabel.layer.cornerRadius = 7.0
         hudLabel.hidden = True
         contentView.addSubview(hudLabel)
 
@@ -118,23 +124,13 @@ Namespace Application
         Exit Sub
       End If
 
-      Dim contentBounds As NSRect = _window.contentView.bounds
-      _imageView.frame = NSMakeRect(transform.OffsetX(),
-        transform.OffsetY(),
-        contentBounds.size.width * transform.Scale(),
-        contentBounds.size.height * transform.Scale())
-
-      If _imageView.layer IsNot Null Then
-        Dim horizontalScale As Double = 1.0
-        If transform.IsHorizontallyFlipped() Then
-          horizontalScale = -1.0
-        End If
-        _imageView.layer.affineTransform = CGAffineTransformMakeScale(horizontalScale, 1.0)
-      End If
+      _imageView.renderTransform(transform)
 
       If _hudLabel IsNot Null Then
-        _hudLabel.stringValue = NSString.stringWithFormat("缩放 %.0f%%", transform.Scale() * 100.0)
-        _hudLabel.hidden = Not showHud
+        _hudLabel.stringValue = NSString.stringWithFormat("%.0f%%", transform.Scale() * 100.0)
+        If showHud Then
+          showHudTemporarily()
+        End If
       End If
     End Sub
 
@@ -148,6 +144,7 @@ Namespace Application
 
       _isDismissing = True
       stopObservingDisplayChanges()
+      stopHudFadeTimer()
 
       If _imageView IsNot Null Then
         _imageView.CommandRequested = Null
@@ -168,6 +165,31 @@ Namespace Application
       Dim commandListener As WorkspaceCommandRequested = CommandRequested()
       If assigned(commandListener) Then
         commandListener(command)
+      End If
+    End Sub
+
+    Private Sub showHudTemporarily()
+      stopHudFadeTimer()
+      _hudLabel.hidden = False
+      _hudLabel.alphaValue = 1.0
+      _hudFadeTimer = NSTimer.scheduledTimerWithTimeInterval(0.8,
+        repeats: False,
+        block: Sub(timer)
+          _hudFadeTimer = Null
+          If _hudLabel IsNot Null Then
+            NSAnimationContext.runAnimationGroup(Sub(animation)
+              animation.duration = 0.2
+              _hudLabel.animator().alphaValue = 0.0
+            End Sub,
+            completionHandler: Null)
+          End If
+        End Sub)
+    End Sub
+
+    Private Sub stopHudFadeTimer()
+      If _hudFadeTimer IsNot Null Then
+        _hudFadeTimer.invalidate()
+        _hudFadeTimer = Null
       End If
     End Sub
 

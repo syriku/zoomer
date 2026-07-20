@@ -14,6 +14,7 @@ Namespace Application
     Private _presentItem As NSMenuItem
     Private _permissionItem As NSMenuItem
     Private _statusTextItem As NSMenuItem
+    Private _globalHotKey As MacGlobalHotKey
 
     Public Sub applicationDidFinishLaunching(notification As NSNotification)
       NSApplication.sharedApplication().setActivationPolicy(NSApplicationActivationPolicy.Accessory)
@@ -24,6 +25,7 @@ Namespace Application
       _workspaceSession.StateChanged = AddressOf workspaceStateDidChange
 
       configureStatusMenu()
+      configureGlobalHotKey()
       refreshStatusMenu()
     End Sub
 
@@ -33,7 +35,14 @@ Namespace Application
 
     Private Sub configureStatusMenu()
       _statusItem = NSStatusBar.systemStatusBar().statusItemWithLength(NSVariableStatusItemLength)
-      _statusItem.button.title = "Z"
+      Dim statusImage As NSImage = NSImage.imageWithSystemSymbolName("magnifyingglass.circle", accessibilityDescription: "Zoomer")
+      If statusImage IsNot Null Then
+        statusImage.template = True
+        _statusItem.button.image = statusImage
+        _statusItem.button.title = ""
+      Else
+        _statusItem.button.title = "Z"
+      End If
 
       Dim menu As NSMenu = New NSMenu()
       _presentItem = New NSMenuItem(Title: "进入工作模式", action: NSSelectorFromString("requestPresentation:"), keyEquivalent: "")
@@ -48,11 +57,34 @@ Namespace Application
       _statusTextItem.enabled = False
       menu.addItem(_statusTextItem)
 
+      menu.addItem(NSMenuItem.separatorItem())
+
       Dim quitItem As NSMenuItem = New NSMenuItem(Title: "退出 Zoomer", action: NSSelectorFromString("quitApplication:"), keyEquivalent: "q")
       quitItem.target = Me
       menu.addItem(quitItem)
 
       _statusItem.menu = menu
+    End Sub
+
+    Private Sub configureGlobalHotKey()
+      _globalHotKey = New MacGlobalHotKey()
+      _globalHotKey.Triggered = AddressOf globalHotKeyTriggered
+      If Not _globalHotKey.registerHotKey() Then
+        _globalHotKey.Triggered = Null
+        _globalHotKey = Null
+        _statusTextItem.title = "无法注册快捷键 ⌥⌘Z"
+      End If
+    End Sub
+
+    Private Sub globalHotKeyTriggered()
+      If _workspaceSession Is Null Then
+        Exit Sub
+      End If
+
+      If _workspaceSession.State() = WorkspaceState.Idle Then
+        _workspaceSession.requestPresentation()
+      End If
+      refreshStatusMenu()
     End Sub
 
     Private Sub workspaceStateDidChange(snapshot As WorkspaceStateSnapshot)
@@ -90,8 +122,9 @@ Namespace Application
         Exit Sub
       End If
 
-      _platformActual.requestScreenRecordingPermission()
-      _platformActual.openScreenRecordingSettings()
+      If _platformActual.screenRecordingPermission() <> WorkspacePermissionState.Granted Then
+        _platformActual.openScreenRecordingSettings()
+      End If
       refreshStatusMenu()
     End Sub
 
@@ -102,6 +135,12 @@ Namespace Application
     End Sub
 
     Private Sub shutdownWorkspace()
+      If _globalHotKey IsNot Null Then
+        _globalHotKey.Triggered = Null
+        _globalHotKey.unregisterHotKey()
+        _globalHotKey = Null
+      End If
+
       If _workspaceSession IsNot Null Then
         _workspaceSession.StateChanged = Null
         _workspaceSession.disposeSession()

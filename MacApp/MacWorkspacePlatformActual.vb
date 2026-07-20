@@ -1,6 +1,7 @@
 Imports AppKit
 Imports CoreGraphics
 Imports Foundation
+Imports RemObjects.Elements.RTL
 Imports ScreenCaptureKit
 Imports [Shared].Core
 
@@ -106,7 +107,12 @@ Namespace Application
 
         Dim filter As SCContentFilter = New SCContentFilter(Display: shareableDisplay, excludingWindows: New NSArray())
         Dim configuration As SCStreamConfiguration = New SCStreamConfiguration()
+        ' ScreenCaptureKit defaults to a logical-size image. Request native backing
+        ' pixels explicitly so a Retina display is not captured at half resolution.
+        configuration.width = CType(Math.Round(display.Width() * display.BackingScale()), UInt64)
+        configuration.height = CType(Math.Round(display.Height() * display.BackingScale()), UInt64)
         configuration.showsCursor = False
+        configuration.backgroundColor = NSColor.blackColor().CGColor
 
         SCScreenshotManager.captureImageWithFilter(filter,
           configuration: configuration,

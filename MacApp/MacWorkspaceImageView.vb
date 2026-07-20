@@ -1,21 +1,77 @@
 Imports AppKit
+Imports CoreGraphics
 Imports Foundation
 Imports [Shared].Core
 
 Namespace Application
 
   Public Class MacWorkspaceImageView
-    Inherits NSImageView
+    Inherits NSView
 
     Public Property CommandRequested As WorkspaceCommandRequested
     Public Property DismissRequested As WorkspaceSurfaceRequested
 
     Private _previousDragPoint As NSPoint
     Private _hasPreviousDragPoint As Boolean
+    Private _image As NSImage
+    Private _transform As WorkspaceTransform = WorkspaceTransform.identityTransform()
+
+    Public Property Image As NSImage
+      Get
+        Return _image
+      End Get
+      Set(value As NSImage)
+        _image = value
+        needsDisplay = True
+      End Set
+    End Property
 
     Public Overrides Function acceptsFirstResponder() As Boolean
       Return True
     End Function
+
+    Public Sub renderTransform(transform As WorkspaceTransform)
+      If transform Is Null Then
+        Exit Sub
+      End If
+
+      _transform = transform
+      needsDisplay = True
+    End Sub
+
+    Public Overrides Sub drawRect(dirtyRect As NSRect)
+      NSColor.blackColor().setFill()
+      NSRectFill(bounds)
+      If _image Is Null Then
+        Exit Sub
+      End If
+
+      Dim destination As NSRect = NSMakeRect(_transform.OffsetX(),
+        _transform.OffsetY(),
+        bounds.size.width * _transform.Scale(),
+        bounds.size.height * _transform.Scale())
+      Dim graphicsContext As NSGraphicsContext = NSGraphicsContext.currentContext()
+      If graphicsContext IsNot Null Then
+        CGContextSetInterpolationQuality(graphicsContext.CGContext, CGInterpolationQuality.High)
+      End If
+
+      If _transform.IsHorizontallyFlipped() AndAlso graphicsContext IsNot Null Then
+        CGContextSaveGState(graphicsContext.CGContext)
+        CGContextTranslateCTM(graphicsContext.CGContext, NSMinX(destination) + NSMaxX(destination), 0.0)
+        CGContextScaleCTM(graphicsContext.CGContext, -1.0, 1.0)
+      End If
+
+      _image.drawInRect(destination,
+        fromRect: NSZeroRect,
+        operation: NSCompositingOperation.Copy,
+        fraction: 1.0,
+        respectFlipped: False,
+        hints: Null)
+
+      If _transform.IsHorizontallyFlipped() AndAlso graphicsContext IsNot Null Then
+        CGContextRestoreGState(graphicsContext.CGContext)
+      End If
+    End Sub
 
     Public Overrides Sub mouseDown(nativeEvent As NSEvent)
       _previousDragPoint = pointForEvent(nativeEvent)
@@ -44,6 +100,12 @@ Namespace Application
       NSCursor.openHandCursor().set()
     End Sub
 
+    Public Overrides Function resignFirstResponder() As Boolean
+      _hasPreviousDragPoint = False
+      NSCursor.arrowCursor().set()
+      Return MyBase.resignFirstResponder()
+    End Function
+
     Public Overrides Sub scrollWheel(nativeEvent As NSEvent)
       If nativeEvent.hasPreciseScrollingDeltas Then
         requestCommand(WorkspaceCommand.panWithDeltaX(nativeEvent.scrollingDeltaX,
@@ -65,11 +127,10 @@ Namespace Application
     End Sub
 
     Public Overrides Sub keyDown(nativeEvent As NSEvent)
-      If nativeEvent.isARepeat Then
-        MyBase.keyDown(nativeEvent)
-        Exit Sub
-      End If
-
+      Dim modifiers As NSEventModifierFlags = nativeEvent.modifierFlags And
+        (NSEventModifierFlags.NSCommandKeyMask Or NSEventModifierFlags.NSAlternateKeyMask Or
+         NSEventModifierFlags.NSControlKeyMask Or NSEventModifierFlags.NSShiftKeyMask)
+      Dim hasShortcutModifier As Boolean = modifiers <> 0
       Dim anchor As NSPoint = pointForEvent(nativeEvent)
       Select Case nativeEvent.keyCode
         Case 53
@@ -77,32 +138,47 @@ Namespace Application
           Exit Sub
 
         Case 29, 82
-          requestCommand(WorkspaceCommand.resetScale())
-          Exit Sub
+          If Not nativeEvent.isARepeat AndAlso
+             (modifiers = 0 OrElse modifiers = NSEventModifierFlags.NSCommandKeyMask) Then
+            requestCommand(WorkspaceCommand.resetScale())
+            Exit Sub
+          End If
 
         Case 15
-          requestCommand(WorkspaceCommand.resetWorkspace())
-          Exit Sub
+          If Not nativeEvent.isARepeat AndAlso Not hasShortcutModifier Then
+            requestCommand(WorkspaceCommand.resetWorkspace())
+            Exit Sub
+          End If
 
         Case 8
-          requestCommand(WorkspaceCommand.centerInViewport(bounds.size.width,
-            height: bounds.size.height))
-          Exit Sub
+          If Not nativeEvent.isARepeat AndAlso Not hasShortcutModifier Then
+            requestCommand(WorkspaceCommand.centerInViewport(bounds.size.width,
+              height: bounds.size.height))
+            Exit Sub
+          End If
 
         Case 18, 83
-          sendPresetScale(1.5, atPoint: anchor)
-          Exit Sub
+          If Not nativeEvent.isARepeat AndAlso Not hasShortcutModifier Then
+            sendPresetScale(1.5, atPoint: anchor)
+            Exit Sub
+          End If
 
         Case 19, 84
-          sendPresetScale(2.0, atPoint: anchor)
-          Exit Sub
+          If Not nativeEvent.isARepeat AndAlso Not hasShortcutModifier Then
+            sendPresetScale(2.0, atPoint: anchor)
+            Exit Sub
+          End If
 
         Case 25, 92
-          sendPresetScale(0.7, atPoint: anchor)
-          Exit Sub
+          If Not nativeEvent.isARepeat AndAlso Not hasShortcutModifier Then
+            sendPresetScale(0.7, atPoint: anchor)
+            Exit Sub
+          End If
 
         Case 46
-          requestCommand(WorkspaceCommand.toggleHorizontalFlip())
+          If Not nativeEvent.isARepeat Then
+            requestCommand(WorkspaceCommand.toggleHorizontalFlip())
+          End If
           Exit Sub
       End Select
 

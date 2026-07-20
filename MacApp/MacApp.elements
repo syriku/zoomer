@@ -26,6 +26,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Cocoa" />
+    <Reference Include="Carbon.HIToolbox" />
     <Reference Include="CoreGraphics" />
     <Reference Include="QuartzCore" />
     <Reference Include="ScreenCaptureKit" />
@@ -42,6 +43,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AppDelegate.vb" />
+    <Compile Include="MacGlobalHotKey.vb" />
     <Compile Include="MacWorkspaceFrame.vb" />
     <Compile Include="MacWorkspaceImageView.vb" />
     <Compile Include="MacWorkspacePlatformActual.vb" />
