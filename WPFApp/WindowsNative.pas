@@ -112,10 +112,10 @@ type
     class method setProcessDpiAwarenessContext(context: IntPtr): Boolean; external;
 
     [DllImport('user32.dll', EntryPoint := 'GetCursorPos', SetLastError := true)]
-    class method getCursorPosition(point(var cursorPoint: WindowsPoint)): Boolean; external;
+    class method getCursorPosition(var cursorPoint: WindowsPoint): Boolean; external;
 
     [DllImport('user32.dll', EntryPoint := 'MonitorFromPoint')]
-    class method monitorFromPoint(point: WindowsPoint) flags(defaultFlags: UInt32): IntPtr; external;
+    class method monitorFromPoint(point: WindowsPoint) options(defaultFlags: UInt32): IntPtr; external;
 
     [DllImport('user32.dll', EntryPoint := 'GetMonitorInfoW', CharSet := CharSet.Unicode, SetLastError := true)]
     class method getMonitorInfo(monitorHandle: IntPtr) info(var monitorInfo: WindowsMonitorInfo): Boolean; external;
@@ -160,10 +160,10 @@ type
     class method createPopupMenu: IntPtr; external;
 
     [DllImport('user32.dll', EntryPoint := 'AppendMenuW', CharSet := CharSet.Unicode)]
-    class method appendMenu(menuHandle: IntPtr) flags(menuFlags: UInt32) identifier(itemIdentifier: UIntPtr) text(itemText: String): Boolean; external;
+    class method appendMenu(menuHandle: IntPtr) options(menuFlags: UInt32) identifier(itemIdentifier: UIntPtr) text(itemText: String): Boolean; external;
 
     [DllImport('user32.dll', EntryPoint := 'TrackPopupMenu')]
-    class method trackPopupMenu(menuHandle: IntPtr) flags(menuFlags: UInt32) x(screenX: Int32) y(screenY: Int32) reserved(reservedValue: Int32) ownerWindow(ownerHandle: IntPtr) rectangle(reservedRectangle: IntPtr): UInt32; external;
+    class method trackPopupMenu(menuHandle: IntPtr) options(menuFlags: UInt32) x(screenX: Int32) y(screenY: Int32) reserved(reservedValue: Int32) ownerWindow(ownerHandle: IntPtr) rectangle(reservedRectangle: IntPtr): UInt32; external;
 
     [DllImport('user32.dll', EntryPoint := 'DestroyMenu')]
     class method destroyMenu(menuHandle: IntPtr): Boolean; external;
@@ -172,7 +172,7 @@ type
     class method setForegroundWindow(windowHandle: IntPtr): Boolean; external;
 
     [DllImport('user32.dll', EntryPoint := 'SetWindowPos', SetLastError := true)]
-    class method setWindowPosition(windowHandle: IntPtr) insertAfterWindow(insertAfterHandle: IntPtr) x(left: Int32) y(top: Int32) width(pixelWidth: Int32) height(pixelHeight: Int32) flags(positionFlags: UInt32): Boolean; external;
+    class method setWindowPosition(windowHandle: IntPtr) insertAfterWindow(insertAfterHandle: IntPtr) x(left: Int32) y(top: Int32) width(pixelWidth: Int32) height(pixelHeight: Int32) options(positionFlags: UInt32): Boolean; external;
   end;
 
 implementation
@@ -237,7 +237,7 @@ end;
 
 class method WindowsNative.monitorInfoAtPoint(point: WindowsPoint) info(var monitorInfo: WindowsMonitorInfo): Boolean;
 begin
-  var monitor := monitorFromPoint(point) flags(MonitorDefaultToNull);
+  var monitor := monitorFromPoint(point) options(MonitorDefaultToNull);
   if monitor = IntPtr.Zero then
     exit false;
 

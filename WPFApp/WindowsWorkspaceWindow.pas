@@ -162,7 +162,7 @@ begin
     y(bounds.Top)
     width(bounds.Width)
     height(bounds.Height)
-    flags(WindowsNative.SetWindowPosNoOwnerZOrder or WindowsNative.SetWindowPosShowWindow) then
+    options(WindowsNative.SetWindowPosNoOwnerZOrder or WindowsNative.SetWindowPosShowWindow) then
     raise new Win32Exception(Marshal.GetLastWin32Error, '无法定位工作区窗口');
 
   Activate;

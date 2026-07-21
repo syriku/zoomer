@@ -1,16 +1,16 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <PropertyGroup>
     <ProductVersion>3.5</ProductVersion>
     <ProjectGuid>{963564F3-70A4-4A81-A2A1-33EB1EAB61BF}</ProjectGuid>
     <RootNamespace>WPFApp</RootNamespace>
     <OutputType>WinExe</OutputType>
-    <AssemblyName>Zoomer</AssemblyName>
+    <BinaryName>Zoomer</BinaryName>
     <ApplicationIcon>Properties\App.ico</ApplicationIcon>
     <ProjectTypeGuids>{89896941-7261-4476-8385-4DA3CE9FDB83};{60DC8134-EBA5-43B8-BCC9-BB4BC16C2548};{656346D9-4656-40DA-A068-22D5425D4639}</ProjectTypeGuids>
     <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
     <Mode>Echoes</Mode>
-    <TargetFramework>.NETCore</TargetFramework>
+    <TargetFramework>.NET10.0</TargetFramework>
     <NETCoreRuntime>Microsoft.WindowsDesktop.App</NETCoreRuntime>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
@@ -31,6 +31,7 @@
     <ProjectReference Include="..\Shared\Shared.elements">
       <Project>{14908247-56B9-47D8-81F5-CD1A6D1C3137}</Project>
       <ProjectFile>..\Shared\Shared.elements</ProjectFile>
+      <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

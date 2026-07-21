@@ -18,6 +18,7 @@ type
       MenuPresentIdentifier: UInt32 = 1001;
       MenuQuitIdentifier: UInt32 = 1002;
 
+    var
     fMessageSource: HwndSource;
     fTrayData: WindowsNotifyIconData;
     fPresentationRequested: WorkspaceSurfaceRequested;
@@ -140,17 +141,17 @@ begin
     if fWorkspaceState <> WorkspaceState.Idle then
       presentFlags := presentFlags or WindowsNative.MenuGrayed;
 
-    WindowsNative.appendMenu(menu) flags(presentFlags) identifier(new UIntPtr(MenuPresentIdentifier)) text('进入工作模式');
-    WindowsNative.appendMenu(menu) flags(WindowsNative.MenuGrayed) identifier(UIntPtr.Zero) text(displayStatusText);
-    WindowsNative.appendMenu(menu) flags(WindowsNative.MenuSeparator) identifier(UIntPtr.Zero) text(nil);
-    WindowsNative.appendMenu(menu) flags(WindowsNative.MenuString) identifier(new UIntPtr(MenuQuitIdentifier)) text('退出 Zoomer');
+    WindowsNative.appendMenu(menu) options(presentFlags) identifier(new UIntPtr(MenuPresentIdentifier)) text('进入工作模式');
+    WindowsNative.appendMenu(menu) options(WindowsNative.MenuGrayed) identifier(UIntPtr.Zero) text(displayStatusText);
+    WindowsNative.appendMenu(menu) options(WindowsNative.MenuSeparator) identifier(UIntPtr.Zero) text(nil);
+    WindowsNative.appendMenu(menu) options(WindowsNative.MenuString) identifier(new UIntPtr(MenuQuitIdentifier)) text('退出 Zoomer');
 
     if not WindowsNative.getCursorPosition(var cursorPoint) then
       exit;
 
     WindowsNative.setForegroundWindow(fMessageSource.Handle);
     var selected := WindowsNative.trackPopupMenu(menu)
-      flags(WindowsNative.TrackPopupRightButton or WindowsNative.TrackPopupReturnCommand)
+      options(WindowsNative.TrackPopupRightButton or WindowsNative.TrackPopupReturnCommand)
       x(cursorPoint.X)
       y(cursorPoint.Y)
       reserved(0)

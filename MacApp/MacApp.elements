@@ -10,7 +10,7 @@
     <CreateAppBundle>True</CreateAppBundle>
     <InfoPListFile>.\Resources\Info.plist</InfoPListFile>
     <EntitlementsFile>Resources\Entitlements.entitlements</EntitlementsFile>
-    <MacIconFile>.\Resources\App.icns</MacIconFile>
+    <ApplicationIcon>.\Resources\App.icns</ApplicationIcon>
     <BinaryName>Zoomer</BinaryName>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
