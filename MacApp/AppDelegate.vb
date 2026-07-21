@@ -12,6 +12,7 @@ Public Class AppDelegate
   Private _statusItem As NSStatusItem
   Private _presentItem As NSMenuItem
   Private _permissionItem As NSMenuItem
+  Private _inputMonitoringItem As NSMenuItem
   Private _statusTextItem As NSMenuItem
   Private _globalHotKey As MacGlobalHotKey
   Private _hotKeyRegistrationStatus As OSStatus
@@ -53,6 +54,10 @@ Public Class AppDelegate
     _permissionItem.target = Me
     menu.addItem(_permissionItem)
 
+    _inputMonitoringItem = New NSMenuItem(Title: "输入监控权限…", action: NSSelectorFromString("requestInputMonitoringPermission:"), keyEquivalent: "")
+    _inputMonitoringItem.target = Me
+    menu.addItem(_inputMonitoringItem)
+
     _statusTextItem = New NSMenuItem(Title: "空闲", action: Null, keyEquivalent: "")
     _statusTextItem.enabled = False
     menu.addItem(_statusTextItem)
@@ -67,6 +72,10 @@ Public Class AppDelegate
   End Sub
 
   Private Sub configureGlobalHotKey()
+    If _globalHotKey IsNot Null Then
+      Return
+    End If
+
     _globalHotKey = New MacGlobalHotKey()
     _globalHotKey.Triggered = AddressOf globalHotKeyTriggered
     If Not _globalHotKey.registerHotKey() Then
@@ -132,6 +141,14 @@ Public Class AppDelegate
       _platformActual.openScreenRecordingSettings()
     End If
     refreshStatusMenu()
+  End Sub
+
+  <IBAction>
+  Private Sub requestInputMonitoringPermission(sender As NSObject)
+    Dim settingsUrl As NSURL = NSURL.URLWithString("x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")
+    If settingsUrl IsNot Null Then
+      NSWorkspace.sharedWorkspace().openURL(settingsUrl)
+    End If
   End Sub
 
   <IBAction>
