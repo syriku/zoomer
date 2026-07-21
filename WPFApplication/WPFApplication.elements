@@ -1,66 +1,45 @@
-﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <PropertyGroup>
     <ProductVersion>3.5</ProductVersion>
-    <ProjectGuid>{FE1251A2-1238-4FEA-9A1A-10F55E4DC391}</ProjectGuid>
+    <ProjectGuid>{963564f3-70a4-4a81-a2a1-33eb1eab61bf}</ProjectGuid>
     <RootNamespace>WPFApplication</RootNamespace>
     <OutputType>WinExe</OutputType>
     <AssemblyName>WPFApplication</AssemblyName>
     <ApplicationIcon>Properties\App.ico</ApplicationIcon>
     <ProjectTypeGuids>{89896941-7261-4476-8385-4DA3CE9FDB83};{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{656346D9-4656-40DA-A068-22D5425D4639}</ProjectTypeGuids>
     <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
-    <TargetFramework>.NETFramework</TargetFramework>
-    <DefaultUses>Microsoft.VisualBasic;System;System.Collections;System.Collections.Generic;System.Data;System.Diagnostics;System.Linq;System.Xml.Linq;System.Threading.Tasks</DefaultUses>
+    <Mode>Echoes</Mode>
+    <TargetFramework>.NETCore</TargetFramework>
+    <NETCoreRuntime>Microsoft.WindowsDesktop.App</NETCoreRuntime>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <Optimize>False</Optimize>
-    <Conditionals>DEBUG;TRACE</Conditionals>
+    <ConditionalDefines>DEBUG;TRACE;</ConditionalDefines>
     <OutputPath>.\Bin\Debug</OutputPath>
     <GeneratePDB>True</GeneratePDB>
-    <GenerateMDB>True</GenerateMDB>
     <EnableAsserts>True</EnableAsserts>
-    <CpuType>anycpu</CpuType>
-    <EnableUnmanagedDebugging>False</EnableUnmanagedDebugging>
-    <ConditionalDefines>DEBUG;TRACE;CONFIG=Debug</ConditionalDefines>
+    <GenerateMDB>True</GenerateMDB>
+    <ConditionalDefines>DEBUG;TRACE;</ConditionalDefines>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <OutputPath>.\Bin\Release</OutputPath>
-    <ConditionalDefines>CONFIG=Release</ConditionalDefines>
-    <CpuType>anycpu</CpuType>
-    <EnableUnmanagedDebugging>False</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="mscorlib" />
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
     <Reference Include="Echoes">
       <Private>True</Private>
     </Reference>
-    <Reference Include="Mercury">
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="PresentationCore" />
-    <Reference Include="PresentationFramework" />
-    <Reference Include="ReachFramework" />
-    <Reference Include="System.Drawing" />
-    <Reference Include="System.Xaml" />
-    <Reference Include="UIAutomationProvider" />
-    <Reference Include="UIAutomationTypes" />
-    <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml" />
-    <Compile Include="App.xaml.vb">
+    <Compile Include="App.xaml.pas">
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
-    <Page Include="Window1.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Compile Include="Window1.xaml.vb">
+    <Page Include="Window1.xaml" />
+    <Compile Include="Window1.xaml.pas">
       <DependentUpon>Window1.xaml</DependentUpon>
     </Compile>
     <None Include="Properties\App.ico" />
-    <Compile Include="Properties\AssemblyInfo.vb" />
+    <Compile Include="Properties\AssemblyInfo.pas" />
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
     </EmbeddedResource>
@@ -68,5 +47,5 @@
       <Generator>SettingsSingleFileGenerator</Generator>
     </None>
   </ItemGroup>
-  <Import Project="$(MSBuildExtensionsPath)\RemObjects Software\Elements\RemObjects.Elements.Echoes.targets" />
+  <Import Project="$(MSBuildExtensionsPath)\RemObjects Software\Elements\RemObjects.Elements.targets" />
 </Project>
