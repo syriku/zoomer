@@ -8,7 +8,10 @@ Project("{656346d9-4656-40da-a068-22d5425d4639}") = "MacApp", "MacApp\MacApp.ele
 EndProject
 Project("{656346d9-4656-40da-a068-22d5425d4639}") = "Shared", "Shared\Shared.elements", "{14908247-56b9-47d8-81f5-cd1a6d1c3137}"
 EndProject
-Project("{656346d9-4656-40da-a068-22d5425d4639}") = "WPFApplication", "WPFApplication\WPFApplication.elements", "{963564f3-70a4-4a81-a2a1-33eb1eab61bf}"
+Project("{656346d9-4656-40da-a068-22d5425d4639}") = "WPFApp", "WPFApp\WPFApp.elements", "{963564f3-70a4-4a81-a2a1-33eb1eab61bf}"
+	ProjectSection(ProjectDependencies) = postProject
+		{14908247-56b9-47d8-81f5-cd1a6d1c3137} = {14908247-56b9-47d8-81f5-cd1a6d1c3137}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -1,12 +1,13 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <PropertyGroup>
     <ProductVersion>3.5</ProductVersion>
-    <ProjectGuid>{963564f3-70a4-4a81-a2a1-33eb1eab61bf}</ProjectGuid>
-    <RootNamespace>WPFApplication</RootNamespace>
+    <ProjectGuid>{963564F3-70A4-4A81-A2A1-33EB1EAB61BF}</ProjectGuid>
+    <RootNamespace>WPFApp</RootNamespace>
     <OutputType>WinExe</OutputType>
-    <AssemblyName>WPFApplication</AssemblyName>
+    <AssemblyName>Zoomer</AssemblyName>
     <ApplicationIcon>Properties\App.ico</ApplicationIcon>
-    <ProjectTypeGuids>{89896941-7261-4476-8385-4DA3CE9FDB83};{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{656346D9-4656-40DA-A068-22D5425D4639}</ProjectTypeGuids>
+    <ProjectTypeGuids>{89896941-7261-4476-8385-4DA3CE9FDB83};{60DC8134-EBA5-43B8-BCC9-BB4BC16C2548};{656346D9-4656-40DA-A068-22D5425D4639}</ProjectTypeGuids>
     <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
     <Mode>Echoes</Mode>
     <TargetFramework>.NETCore</TargetFramework>
@@ -14,38 +15,37 @@
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <Optimize>False</Optimize>
-    <ConditionalDefines>DEBUG;TRACE;</ConditionalDefines>
+    <ConditionalDefines>DEBUG;TRACE;CONFIG=Debug</ConditionalDefines>
     <OutputPath>.\Bin\Debug</OutputPath>
     <GeneratePDB>True</GeneratePDB>
     <EnableAsserts>True</EnableAsserts>
-    <GenerateMDB>True</GenerateMDB>
-    <ConditionalDefines>DEBUG;TRACE;</ConditionalDefines>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <OutputPath>.\Bin\Release</OutputPath>
+    <ConditionalDefines>CONFIG=Release</ConditionalDefines>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Echoes">
       <Private>True</Private>
     </Reference>
+    <ProjectReference Include="..\Shared\Shared.elements">
+      <Project>{14908247-56B9-47D8-81F5-CD1A6D1C3137}</Project>
+      <ProjectFile>..\Shared\Shared.elements</ProjectFile>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml" />
     <Compile Include="App.xaml.pas">
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
-    <Page Include="Window1.xaml" />
-    <Compile Include="Window1.xaml.pas">
-      <DependentUpon>Window1.xaml</DependentUpon>
-    </Compile>
+    <Compile Include="WindowsNative.pas" />
+    <Compile Include="WindowsShellIntegration.pas" />
+    <Compile Include="WindowsWorkspaceFrame.pas" />
+    <Compile Include="WindowsWorkspacePlatformActual.pas" />
+    <Compile Include="WindowsWorkspaceSurfaceActual.pas" />
+    <Compile Include="WindowsWorkspaceWindow.pas" />
     <None Include="Properties\App.ico" />
     <Compile Include="Properties\AssemblyInfo.pas" />
-    <EmbeddedResource Include="Properties\Resources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-    </EmbeddedResource>
-    <None Include="Properties\Settings.settings">
-      <Generator>SettingsSingleFileGenerator</Generator>
-    </None>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\RemObjects Software\Elements\RemObjects.Elements.targets" />
 </Project>

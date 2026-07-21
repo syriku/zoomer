@@ -2,12 +2,9 @@
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <PropertyGroup>
     <ProjectGuid>{14908247-56B9-47D8-81F5-CD1A6D1C3137}</ProjectGuid>
-    <OutputType>StaticLibrary</OutputType>
     <RootNamespace>Core</RootNamespace>
     <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
-    <DeploymentTargetVersion>26.0</DeploymentTargetVersion>
-    <Mode>Toffee</Mode>
-    <SDK>macOS</SDK>
+    <OutputPathUsesTargets>True</OutputPathUsesTargets>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <OutputPath>.\Bin\Debug</OutputPath>
@@ -20,17 +17,27 @@
     <OutputPath>.\Bin\Release</OutputPath>
     <ConditionalDefines>CONFIG=Release</ConditionalDefines>
   </PropertyGroup>
+  <PropertyGroup Condition=" '$(Target)' == 'Toffee.macOS' ">
+    <Mode>Toffee</Mode>
+    <SDK>macOS</SDK>
+    <OutputType>StaticLibrary</OutputType>
+    <DeploymentTargetVersion>26.0</DeploymentTargetVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Target)' == 'Echoes.Core' ">
+    <Mode>Echoes</Mode>
+    <TargetFramework>.NETCore</TargetFramework>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="#" />
-    <Reference Include="Foundation" />
-    <Reference Include="rtl" />
-    <Reference Include="libToffee" />
-    <Reference Include="libElements" />
+    <Reference Include="Elements">
+      <Private>True</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="WorkspaceContracts.pas" />
     <Compile Include="WorkspaceTransformModel.pas" />
     <Compile Include="WorkspaceSession.pas" />
   </ItemGroup>
-  <Import Project="$(MSBuildExtensionsPath)\RemObjects Software\Elements\RemObjects.Elements.Toffee.targets" />
+  <Import Project="$(MSBuildExtensionsPath)\RemObjects Software\Elements\RemObjects.Elements.targets" />
 </Project>
