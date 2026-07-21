@@ -33,20 +33,19 @@
     <Reference Include="rtl" />
     <Reference Include="libToffee" />
     <Reference Include="libElements" />
-    <Reference Include="libMercury" />
     <ProjectReference Include="..\Shared\Shared.elements">
       <Project>{14908247-56B9-47D8-81F5-CD1A6D1C3137}</Project>
       <ProjectFile>..\Shared\Shared.elements</ProjectFile>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AppDelegate.vb" />
-    <Compile Include="MacGlobalHotKey.vb" />
-    <Compile Include="MacWorkspaceFrame.vb" />
-    <Compile Include="MacWorkspaceImageView.vb" />
-    <Compile Include="MacWorkspacePlatformActual.vb" />
-    <Compile Include="MacWorkspaceSurfaceActual.vb" />
-    <Compile Include="MacWorkspaceWindow.vb" />
+    <Compile Include="AppDelegate.pas" />
+    <Compile Include="MacGlobalHotKey.pas" />
+    <Compile Include="MacWorkspaceFrame.pas" />
+    <Compile Include="MacWorkspaceImageView.pas" />
+    <Compile Include="MacWorkspacePlatformActual.pas" />
+    <Compile Include="MacWorkspaceSurfaceActual.pas" />
+    <Compile Include="MacWorkspaceWindow.pas" />
     <None Include="Resources\Entitlements.entitlements" />
     <Content Include="Resources\Info.plist" />
     <Content Include="Resources\App.icns" />

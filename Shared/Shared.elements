@@ -5,7 +5,6 @@
     <OutputType>StaticLibrary</OutputType>
     <RootNamespace>Core</RootNamespace>
     <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
-    <DefaultUses>RemObjects.Elements.RTL</DefaultUses>
     <DeploymentTargetVersion>26.0</DeploymentTargetVersion>
     <Mode>Toffee</Mode>
     <SDK>macOS</SDK>
@@ -23,15 +22,15 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="#" />
-    <Reference Include="Mercury" />
-    <Reference Include="Elements">
-      <Private>True</Private>
-    </Reference>
+    <Reference Include="Foundation" />
+    <Reference Include="rtl" />
+    <Reference Include="libToffee" />
+    <Reference Include="libElements" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="WorkspaceContracts.vb" />
-    <Compile Include="WorkspaceTransformModel.vb" />
-    <Compile Include="WorkspaceSession.vb" />
+    <Compile Include="WorkspaceContracts.pas" />
+    <Compile Include="WorkspaceTransformModel.pas" />
+    <Compile Include="WorkspaceSession.pas" />
   </ItemGroup>
-  <Import Project="$(MSBuildExtensionsPath)\RemObjects Software\Elements\RemObjects.Elements.targets" />
+  <Import Project="$(MSBuildExtensionsPath)\RemObjects Software\Elements\RemObjects.Elements.Toffee.targets" />
 </Project>

@@ -2,9 +2,9 @@
 
 ## Technology Stack
 
-- This branch is a rewrite of `main` using RemObjects Elements. Use Mercury (`.vb`) for all new source code; do not reintroduce the C# projects or the Objective-C native bridge from `main`.
+- This branch is a rewrite of `main` using RemObjects Elements. Use Oxygene (`.pas`) for all new source code; do not reintroduce the C# projects or the Objective-C native bridge from `main`.
 - Use Elements project and solution files (`.elements` and `Zoomer.sln`). Fire is the primary macOS IDE, and Water or Visual Studio with Elements is used on Windows.
-- `MacApp` targets Cocoa through the Toffee backend. Implement the macOS application layer and the responsibilities of the former `native/Zoomer.Native` library directly in Mercury with Cocoa frameworks.
+- `MacApp` targets Cocoa through the Toffee backend. Implement the macOS application layer and the responsibilities of the former `native/Zoomer.Native` library directly in Oxygene with Cocoa frameworks.
 - `WPFApp` is the Windows application layer and targets WPF through the Echoes/.NET backend. The scaffold is currently named `WPFApplication`; rename it to `WPFApp` when implementation work begins.
 - `Shared` replaces the former `Zoomer.Core`. Keep reusable state, transforms, controller flow, and platform contracts there. It must not depend on Cocoa, WPF, or other platform UI APIs.
 - Keep project references and target settings compatible across the Toffee and Echoes consumers. Do not add targets to `Shared` unless an application or test project actually needs them.
@@ -22,11 +22,11 @@
 - Marshal macOS UI and capture callbacks onto the main queue. Keep WPF UI work on its dispatcher thread.
 - User-facing UI, status, and error text, as well as the README, use Simplified Chinese.
 
-## Mercury Source Conventions
+## Oxygene Source Conventions
 
-- Set each project's root namespace with its `.elements` `RootNamespace` property. Only use `Namespace` and `End Namespace` in `.vb` source files when a nested namespace is explicitly required; otherwise, rely on the project root namespace. `MacApp` and `WPFApplication` use their project names; `Shared` uses `Core` because `Shared` is a Mercury keyword.
-- Use Mercury multi-part method names for every API with two or more parameters in every project, not only `MacApp`. Preserve semantic parameter labels at declaration and call sites, for example `Sub presentFrame(frame As IWorkspaceFrame, onDisplay display As WorkspaceDisplay)` and `surface.presentFrame(frame, onDisplay: display)`.
-- Prefer selector-shaped public APIs such as `captureDisplayWithRequestId(requestId, completion: completion)` and `renderTransform(transform, showHud: showHud)`. Do not replace their labels with positional-only overloads.
+- Set each project's root namespace with its `.elements` `RootNamespace` property. Each `.pas` source file declares its namespace explicitly and ends with `end.`; `MacApp` and `WPFApplication` use their project names, while `Shared` continues to expose `Core`.
+- Use Oxygene multi-part method names for every API with two or more parameters in every project, not only `MacApp`. Preserve the existing parameter identifiers and semantic labels at declaration and call sites, for example `method presentFrame(workspaceFrame: IWorkspaceFrame) onDisplay(display: WorkspaceDisplay): WorkspacePresentationResult;` and `surface.presentFrame(frame) onDisplay(display);`.
+- Prefer selector-shaped public APIs such as `captureDisplayWithRequestId(requestId) completion(completion)` and `renderTransform(transform) showHud(showHud)`. Do not replace their labels with positional-only overloads.
 - Keep public shared contract types in `Core`; Mac-specific implementations belong directly under the `MacApp` root namespace unless a nested namespace is explicitly required.
 
 ## Build and Verification
