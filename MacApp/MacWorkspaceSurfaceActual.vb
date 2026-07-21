@@ -66,6 +66,9 @@ Public Class MacWorkspaceSurfaceActual
       newWindow.backgroundColor = NSColor.blackColor
       newWindow.opaque = True
       newWindow.acceptsMouseMovedEvents = True
+      newWindow.level = NSMainMenuWindowLevel
+      newWindow.collectionBehavior = NSWindowCollectionBehavior.CanJoinAllSpaces Or
+      NSWindowCollectionBehavior.FullScreenAuxiliary
 
       Dim contentFrame As NSRect = NSMakeRect(0.0, 0.0, screenFrame.size.width, screenFrame.size.height)
       Dim contentView As NSView = New NSView(Frame: contentFrame)
