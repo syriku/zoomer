@@ -21,6 +21,8 @@ type
     fTargetDisplayId: String;
     fScreenObserver: NSObject;
     fWindowCloseObserver: NSObject;
+    fWindowResignKeyObserver: NSObject;
+    fWindowBecomeKeyObserver: NSObject;
     fHudFadeTimer: NSTimer;
     fIsDismissing: Boolean;
     fDidRequestDisplayDismissal: Boolean;
@@ -71,6 +73,17 @@ type
           if not fIsDismissing then
             requestDismissal;
         end);
+      fWindowResignKeyObserver := center.addObserverForName(NSWindowDidResignKeyNotification) object(window) queue(NSOperationQueue.mainQueue) usingBlock(method(notification: NSNotification)
+        begin
+          if fImageView <> nil then
+            fImageView.deactivateLaserPointer;
+        end);
+      fWindowBecomeKeyObserver := center.addObserverForName(NSWindowDidBecomeKeyNotification) object(window) queue(NSOperationQueue.mainQueue) usingBlock(method(notification: NSNotification)
+        begin
+          if fImageView <> nil then
+            fImageView.activateLaserPointerAtPoint(
+              fImageView.convertPoint(window.mouseLocationOutsideOfEventStream) fromView(nil));
+        end);
     end;
     method stopObservingDisplayChanges;
     begin
@@ -83,6 +96,16 @@ type
       if fWindowCloseObserver <> nil then begin
         center.removeObserver(fWindowCloseObserver);
         fWindowCloseObserver := nil;
+      end;
+
+      if fWindowResignKeyObserver <> nil then begin
+        center.removeObserver(fWindowResignKeyObserver);
+        fWindowResignKeyObserver := nil;
+      end;
+
+      if fWindowBecomeKeyObserver <> nil then begin
+        center.removeObserver(fWindowBecomeKeyObserver);
+        fWindowBecomeKeyObserver := nil;
       end;
     end;
     method checkTargetDisplayAvailability;
@@ -224,11 +247,15 @@ type
         NSApplication.sharedApplication.activateIgnoringOtherApps(true);
         newWindow.makeKeyAndOrderFront(nil);
         newWindow.makeFirstResponder(imageView);
+        imageView.activateLaserPointerAtPoint(
+          imageView.convertPoint(newWindow.mouseLocationOutsideOfEventStream) fromView(nil));
         result := WorkspacePresentationResult.succeeded;
       except
         on caughtError: Exception do begin
           fIsDismissing := true;
           stopObservingDisplayChanges;
+          if fImageView <> nil then
+            fImageView.cleanupInteraction;
           if newWindow <> nil then
             newWindow.close;
 
@@ -277,6 +304,7 @@ type
       if fImageView <> nil then begin
         fImageView.CommandRequested := nil;
         fImageView.DismissRequested := nil;
+        fImageView.cleanupInteraction;
       end;
 
       if fWindow <> nil then begin

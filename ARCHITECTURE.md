@@ -47,7 +47,7 @@ renderTransform(transform) showHud(showHud)
 dismissPresentation()
 ```
 
-三个回调成员是可写的委托属性，而不是 Oxygene `event`：MacApp 在展示期间赋入回调，Shared 在关闭时清空它们。这样既表达单一会话的所有权，也能在 Toffee 后端可靠生成代码。原生输入先映射为 `WorkspaceCommand`，再通过 `CommandRequested` 交给 `WorkspaceSession`。初始命令集覆盖关闭、滚轮缩放、捏合缩放、平移、倍率重置、完全重置、居中、预设倍率和水平翻转。激光笔、聚光与绘图属于 MacApp 的渲染/输入实现；后续需要共享规则时再扩展为独立的 Shared 状态契约。
+三个回调成员是可写的委托属性，而不是 Oxygene `event`：MacApp 在展示期间赋入回调，Shared 在关闭时清空它们。这样既表达单一会话的所有权，也能在 Toffee 后端可靠生成代码。原生输入先映射为 `WorkspaceCommand`，再通过 `CommandRequested` 交给 `WorkspaceSession`。初始命令集覆盖关闭、滚轮缩放、捏合缩放、平移、倍率重置、完全重置、居中、预设倍率和水平翻转。激光笔与绘图属于 MacApp/WPFApp 的渲染和输入实现：平台窗口隐藏系统指针并绘制激光点，绘图模式把轨迹保存为画布坐标，使其随工作区变换同步移动。
 
 ## 生命周期与资源规则
 

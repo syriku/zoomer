@@ -2,6 +2,7 @@ namespace WPFApp;
 
 uses
   System,
+  System.Collections.Generic,
   System.ComponentModel,
   System.Runtime.InteropServices,
   System.Windows,
@@ -17,9 +18,19 @@ uses
 type
   WindowsWorkspaceWindow = public class(Window)
   private
+    const
+      LaserPointerRadius: Double = 7.0;
+      LaserDrawingHoldDurationSeconds: Double = 3.0;
+      LaserDrawingFadeDurationSeconds: Double = 0.8;
+      LaserDrawingMinimumPointDistanceSquared: Double = 0.25;
     fRoot: Grid;
     fImage: System.Windows.Controls.Image;
     fImageTransform: MatrixTransform;
+    fLaserDrawingLayer: Canvas;
+    fLaserPointer: System.Windows.Shapes.Ellipse;
+    fLaserPointerTransform: TranslateTransform;
+    fLaserDrawings: List<System.Windows.Shapes.Polyline>;
+    fActiveLaserDrawing: System.Windows.Shapes.Polyline;
     fHud: Border;
     fHudText: TextBlock;
     fHudDelayTimer: DispatcherTimer;
@@ -31,6 +42,7 @@ type
     fTransform: WorkspaceTransform := WorkspaceTransform.identityTransform;
     fPreviousDragPoint: Point;
     fIsDragging: Boolean;
+    fLaserDrawingMode: Boolean;
     fAllowsClose: Boolean;
     fDidRequestClose: Boolean;
     fIsClosed: Boolean;
@@ -77,14 +89,111 @@ type
       fHudDelayTimer.Stop;
       fHudDelayTimer.Start;
     end;
-    method endDrag;
+    method setLaserPointerActive(active: Boolean);
     begin
-      if not fIsDragging then
+      if active then begin
+        updateLaserPointerCenter(Mouse.GetPosition(fRoot));
+        fLaserPointer.Visibility := Visibility.Visible;
+      end
+      else
+        fLaserPointer.Visibility := Visibility.Collapsed;
+    end;
+    method updateLaserPointerCenter(point: Point);
+    begin
+      fLaserPointerTransform.X := point.X - LaserPointerRadius;
+      fLaserPointerTransform.Y := point.Y - LaserPointerRadius;
+    end;
+    method beginLaserDrawing(point: Point);
+    begin
+      var drawing := new System.Windows.Shapes.Polyline;
+      drawing.IsHitTestVisible := false;
+      drawing.Stroke := new SolidColorBrush(Color.FromArgb(235, 255, 13, 13));
+      drawing.StrokeEndLineCap := PenLineCap.Round;
+      drawing.StrokeLineJoin := PenLineJoin.Round;
+      drawing.StrokeStartLineCap := PenLineCap.Round;
+      drawing.StrokeThickness := 3.5;
+      drawing.Points.Add(point);
+      fLaserDrawingLayer.Children.Add(drawing);
+      fLaserDrawings.Add(drawing);
+      fActiveLaserDrawing := drawing;
+    end;
+    method appendLaserDrawing(point: Point);
+    begin
+      if fActiveLaserDrawing = nil then
         exit;
+
+      var previous := fActiveLaserDrawing.Points[fActiveLaserDrawing.Points.Count - 1];
+      var deltaX := point.X - previous.X;
+      var deltaY := point.Y - previous.Y;
+      var minimumDistanceSquared := LaserDrawingMinimumPointDistanceSquared /
+        (fTransform.Scale * fTransform.Scale);
+      if (deltaX * deltaX) + (deltaY * deltaY) < minimumDistanceSquared then
+        exit;
+
+      fActiveLaserDrawing.Points.Add(point);
+    end;
+    method toCanvasPoint(point: Point): Point;
+    begin
+      var rootFromCanvas := fImageTransform.Matrix;
+      if not rootFromCanvas.HasInverse then
+        exit point;
+
+      rootFromCanvas.Invert;
+      result := rootFromCanvas.Transform(point);
+    end;
+    method removeLaserDrawing(drawing: System.Windows.Shapes.Polyline);
+    begin
+      if not fLaserDrawings.Remove(drawing) then
+        exit;
+
+      drawing.BeginAnimation(UIElement.OpacityProperty, nil);
+      fLaserDrawingLayer.Children.Remove(drawing);
+    end;
+    method endActiveLaserDrawing;
+    begin
+      var drawing := fActiveLaserDrawing;
+      if drawing = nil then
+        exit;
+
+      fActiveLaserDrawing := nil;
+      var fade := new DoubleAnimation;
+      fade.BeginTime := TimeSpan.FromSeconds(LaserDrawingHoldDurationSeconds);
+      fade.Duration := new Duration(TimeSpan.FromSeconds(LaserDrawingFadeDurationSeconds));
+      fade.FillBehavior := FillBehavior.HoldEnd;
+      fade.From := 1.0;
+      fade.To := 0.0;
+      fade.Completed += method(sender: Object) eventArgs: EventArgs
+        begin
+          removeLaserDrawing(drawing);
+        end;
+      drawing.BeginAnimation(UIElement.OpacityProperty, fade);
+    end;
+    method clearLaserDrawings;
+    begin
+      fActiveLaserDrawing := nil;
+      if fLaserDrawings <> nil then begin
+        for each drawing: System.Windows.Shapes.Polyline in fLaserDrawings do
+          drawing.BeginAnimation(UIElement.OpacityProperty, nil);
+        fLaserDrawings.Clear;
+      end;
+      if fLaserDrawingLayer <> nil then
+        fLaserDrawingLayer.Children.Clear;
+    end;
+    method endMouseInteraction;
+    begin
+      endActiveLaserDrawing;
       fIsDragging := false;
       if IsMouseCaptured then
         Mouse.Capture(nil);
-      Cursor := Cursors.Hand;
+      Cursor := Cursors.None;
+    end;
+    method abortMouseInteraction;
+    begin
+      fActiveLaserDrawing := nil;
+      fIsDragging := false;
+      if IsMouseCaptured then
+        Mouse.Capture(nil);
+      Cursor := Cursors.None;
     end;
     method requestCommand(command: WorkspaceCommand);
     begin
@@ -149,33 +258,72 @@ type
     method OnMouseLeftButtonDown(eventArgs: MouseButtonEventArgs); override;
     begin
       inherited OnMouseLeftButtonDown(eventArgs);
-      fIsDragging := true;
-      fPreviousDragPoint := eventArgs.GetPosition(fRoot);
+      if (fActiveLaserDrawing <> nil) or fIsDragging then
+        endMouseInteraction;
+      var point := eventArgs.GetPosition(fRoot);
+      updateLaserPointerCenter(point);
       Mouse.Capture(self);
-      Cursor := Cursors.SizeAll;
+      if fLaserDrawingMode then
+        beginLaserDrawing(toCanvasPoint(point))
+      else begin
+        fIsDragging := true;
+        fPreviousDragPoint := point;
+      end;
       eventArgs.Handled := true;
     end;
     method OnMouseMove(eventArgs: MouseEventArgs); override;
     begin
       inherited OnMouseMove(eventArgs);
+      var point := eventArgs.GetPosition(fRoot);
+      updateLaserPointerCenter(point);
+      if fActiveLaserDrawing <> nil then begin
+        if eventArgs.LeftButton <> MouseButtonState.Pressed then begin
+          endMouseInteraction;
+          eventArgs.Handled := true;
+          exit;
+        end;
+
+        appendLaserDrawing(toCanvasPoint(point));
+        eventArgs.Handled := true;
+        exit;
+      end;
       if not fIsDragging then
         exit;
       if eventArgs.LeftButton <> MouseButtonState.Pressed then begin
-        endDrag;
+        endMouseInteraction;
         exit;
       end;
 
-      var currentPoint := eventArgs.GetPosition(fRoot);
-      requestCommand(WorkspaceCommand.panWithDeltaX(currentPoint.X - fPreviousDragPoint.X)
-        deltaY(currentPoint.Y - fPreviousDragPoint.Y));
-      fPreviousDragPoint := currentPoint;
+      requestCommand(WorkspaceCommand.panWithDeltaX(point.X - fPreviousDragPoint.X)
+        deltaY(point.Y - fPreviousDragPoint.Y));
+      fPreviousDragPoint := point;
       eventArgs.Handled := true;
     end;
     method OnMouseLeftButtonUp(eventArgs: MouseButtonEventArgs); override;
     begin
       inherited OnMouseLeftButtonUp(eventArgs);
-      endDrag;
+      var point := eventArgs.GetPosition(fRoot);
+      updateLaserPointerCenter(point);
+      if fActiveLaserDrawing <> nil then
+        appendLaserDrawing(toCanvasPoint(point));
+      endMouseInteraction;
       eventArgs.Handled := true;
+    end;
+    method OnMouseEnter(eventArgs: MouseEventArgs); override;
+    begin
+      inherited OnMouseEnter(eventArgs);
+      setLaserPointerActive(true);
+    end;
+    method OnMouseLeave(eventArgs: MouseEventArgs); override;
+    begin
+      setLaserPointerActive(false);
+      inherited OnMouseLeave(eventArgs);
+    end;
+    method OnLostMouseCapture(eventArgs: MouseEventArgs); override;
+    begin
+      inherited OnLostMouseCapture(eventArgs);
+      if (fActiveLaserDrawing <> nil) or fIsDragging then
+        endMouseInteraction;
     end;
     method OnPreviewMouseWheel(eventArgs: MouseWheelEventArgs); override;
     begin
@@ -221,6 +369,14 @@ type
             eventArgs.Handled := true;
             exit;
           end;
+
+        Key.D:
+          if hasNoShortcutModifiers then begin
+            if not eventArgs.IsRepeat then
+              fLaserDrawingMode := not fLaserDrawingMode;
+            eventArgs.Handled := true;
+            exit;
+          end;
       end;
 
       inherited OnPreviewKeyDown(eventArgs);
@@ -239,6 +395,12 @@ type
       end;
       inherited OnClosing(eventArgs);
     end;
+    method OnDeactivated(eventArgs: EventArgs); override;
+    begin
+      setLaserPointerActive(false);
+      endMouseInteraction;
+      inherited OnDeactivated(eventArgs);
+    end;
   public
     constructor;
     begin
@@ -250,9 +412,11 @@ type
       WindowStartupLocation := WindowStartupLocation.Manual;
       WindowStyle := WindowStyle.None;
       UseLayoutRounding := true;
-      Cursor := Cursors.Hand;
+      Cursor := Cursors.None;
 
       fImageTransform := new MatrixTransform;
+      fLaserPointerTransform := new TranslateTransform;
+      fLaserDrawings := new List<System.Windows.Shapes.Polyline>;
       fImage := new System.Windows.Controls.Image;
       fImage.RenderTransform := fImageTransform;
       fImage.RenderTransformOrigin := new Point(0.0, 0.0);
@@ -260,6 +424,24 @@ type
       fImage.Stretch := Stretch.Fill;
       fImage.SizeChanged += @imageSizeChanged;
       RenderOptions.SetBitmapScalingMode(fImage, BitmapScalingMode.HighQuality);
+
+      fLaserDrawingLayer := new Canvas;
+      fLaserDrawingLayer.ClipToBounds := true;
+      fLaserDrawingLayer.IsHitTestVisible := false;
+      fLaserDrawingLayer.RenderTransform := fImageTransform;
+      fLaserDrawingLayer.RenderTransformOrigin := new Point(0.0, 0.0);
+
+      fLaserPointer := new System.Windows.Shapes.Ellipse;
+      fLaserPointer.Fill := new SolidColorBrush(Color.FromArgb(245, 255, 13, 13));
+      fLaserPointer.Height := LaserPointerRadius * 2.0;
+      fLaserPointer.HorizontalAlignment := HorizontalAlignment.Left;
+      fLaserPointer.IsHitTestVisible := false;
+      fLaserPointer.RenderTransform := fLaserPointerTransform;
+      fLaserPointer.Stroke := Brushes.White;
+      fLaserPointer.StrokeThickness := 1.0;
+      fLaserPointer.VerticalAlignment := VerticalAlignment.Top;
+      fLaserPointer.Visibility := Visibility.Collapsed;
+      fLaserPointer.Width := LaserPointerRadius * 2.0;
 
       fHudText := new TextBlock;
       fHudText.FontFamily := new FontFamily('Consolas');
@@ -286,6 +468,8 @@ type
       fRoot.Background := Brushes.Black;
       fRoot.ClipToBounds := true;
       fRoot.Children.Add(fImage);
+      fRoot.Children.Add(fLaserDrawingLayer);
+      fRoot.Children.Add(fLaserPointer);
       fRoot.Children.Add(fHud);
       Content := fRoot;
 
@@ -339,6 +523,7 @@ type
 
       Activate;
       Focus;
+      setLaserPointerActive(true);
     end;
     method renderTransform(transform: WorkspaceTransform) showHud(showHud: Boolean);
     begin
@@ -361,7 +546,9 @@ type
       fAllowsClose := true;
       fQualityTimer.Stop;
       fHudDelayTimer.Stop;
-      endDrag;
+      abortMouseInteraction;
+      clearLaserDrawings;
+      setLaserPointerActive(false);
       if assigned(fWindowSource) then begin
         fWindowSource.RemoveHook(@windowMessageHook);
         fWindowSource := nil;
