@@ -19,7 +19,10 @@ type
   WindowsWorkspaceWindow = public class(Window)
   private
     const
-      LaserPointerRadius: Double = 7.0;
+      LaserPointerCoreRadius: Double = 4.0;
+      LaserPointerGlowRadius: Double = 11.0;
+      LaserDrawingCoreThickness: Double = 3.5;
+      LaserDrawingGlowThickness: Double = 7.0;
       SpotlightRadius: Double = 90.0;
       SpotlightTransparentStop: Double = 0.72;
       SpotlightAnimationDurationSeconds: Double = 0.24;
@@ -34,9 +37,12 @@ type
     fSpotlightLayer: System.Windows.Shapes.Rectangle;
     fSpotlightBrush: RadialGradientBrush;
     fLaserDrawingLayer: Canvas;
+    fLaserPointerGlow: System.Windows.Shapes.Ellipse;
+    fLaserPointerGlowTransform: TranslateTransform;
     fLaserPointer: System.Windows.Shapes.Ellipse;
     fLaserPointerTransform: TranslateTransform;
     fLaserDrawings: List<System.Windows.Shapes.Polyline>;
+    fActiveLaserGlow: System.Windows.Shapes.Polyline;
     fActiveLaserDrawing: System.Windows.Shapes.Polyline;
     fHud: Border;
     fHudText: TextBlock;
@@ -107,15 +113,20 @@ type
     begin
       if active then begin
         updateLaserPointerCenter(Mouse.GetPosition(fRoot));
+        fLaserPointerGlow.Visibility := Visibility.Visible;
         fLaserPointer.Visibility := Visibility.Visible;
       end
-      else
+      else begin
+        fLaserPointerGlow.Visibility := Visibility.Collapsed;
         fLaserPointer.Visibility := Visibility.Collapsed;
+      end;
     end;
     method updateLaserPointerCenter(point: Point);
     begin
-      fLaserPointerTransform.X := point.X - LaserPointerRadius;
-      fLaserPointerTransform.Y := point.Y - LaserPointerRadius;
+      fLaserPointerGlowTransform.X := point.X - LaserPointerGlowRadius;
+      fLaserPointerGlowTransform.Y := point.Y - LaserPointerGlowRadius;
+      fLaserPointerTransform.X := point.X - LaserPointerCoreRadius;
+      fLaserPointerTransform.Y := point.Y - LaserPointerCoreRadius;
     end;
     method updateSpotlightCenter(point: Point);
     begin
@@ -203,16 +214,30 @@ type
     end;
     method beginLaserDrawing(point: Point);
     begin
+      var glow := new System.Windows.Shapes.Polyline;
+      glow.IsHitTestVisible := false;
+      glow.Stroke := new SolidColorBrush(Color.FromArgb(72, 255, 13, 13));
+      glow.StrokeEndLineCap := PenLineCap.Round;
+      glow.StrokeLineJoin := PenLineJoin.Round;
+      glow.StrokeStartLineCap := PenLineCap.Round;
+      glow.StrokeThickness := LaserDrawingGlowThickness;
+      glow.Points.Add(point);
+
       var drawing := new System.Windows.Shapes.Polyline;
       drawing.IsHitTestVisible := false;
-      drawing.Stroke := new SolidColorBrush(Color.FromArgb(235, 255, 13, 13));
+      drawing.Stroke := new SolidColorBrush(Color.FromArgb(245, 255, 13, 13));
       drawing.StrokeEndLineCap := PenLineCap.Round;
       drawing.StrokeLineJoin := PenLineJoin.Round;
       drawing.StrokeStartLineCap := PenLineCap.Round;
-      drawing.StrokeThickness := 3.5;
+      drawing.StrokeThickness := LaserDrawingCoreThickness;
       drawing.Points.Add(point);
+
+      // Keep the soft stroke below the sharp core, matching the native renderer.
+      fLaserDrawingLayer.Children.Add(glow);
       fLaserDrawingLayer.Children.Add(drawing);
+      fLaserDrawings.Add(glow);
       fLaserDrawings.Add(drawing);
+      fActiveLaserGlow := glow;
       fActiveLaserDrawing := drawing;
     end;
     method appendLaserDrawing(point: Point);
@@ -228,6 +253,7 @@ type
       if (deltaX * deltaX) + (deltaY * deltaY) < minimumDistanceSquared then
         exit;
 
+      fActiveLaserGlow.Points.Add(point);
       fActiveLaserDrawing.Points.Add(point);
     end;
     method toCanvasPoint(point: Point): Point;
@@ -250,24 +276,35 @@ type
     method endActiveLaserDrawing;
     begin
       var drawing := fActiveLaserDrawing;
-      if drawing = nil then
+      var glow := fActiveLaserGlow;
+      if (drawing = nil) or (glow = nil) then
         exit;
 
       fActiveLaserDrawing := nil;
+      fActiveLaserGlow := nil;
       var fade := new DoubleAnimation;
       fade.BeginTime := TimeSpan.FromSeconds(LaserDrawingHoldDurationSeconds);
       fade.Duration := new Duration(TimeSpan.FromSeconds(LaserDrawingFadeDurationSeconds));
       fade.FillBehavior := FillBehavior.HoldEnd;
       fade.From := 1.0;
       fade.To := 0.0;
+      var glowFade := new DoubleAnimation;
+      glowFade.BeginTime := fade.BeginTime;
+      glowFade.Duration := fade.Duration;
+      glowFade.FillBehavior := fade.FillBehavior;
+      glowFade.From := fade.From;
+      glowFade.To := fade.To;
       fade.Completed += (sender, eventArgs) -> begin
         removeLaserDrawing(drawing);
+        removeLaserDrawing(glow);
       end;
+      glow.BeginAnimation(UIElement.OpacityProperty, glowFade);
       drawing.BeginAnimation(UIElement.OpacityProperty, fade);
     end;
     method clearLaserDrawings;
     begin
       fActiveLaserDrawing := nil;
+      fActiveLaserGlow := nil;
       if fLaserDrawings <> nil then begin
         for each drawing: System.Windows.Shapes.Polyline in fLaserDrawings do
           drawing.BeginAnimation(UIElement.OpacityProperty, nil);
@@ -287,6 +324,7 @@ type
     method abortMouseInteraction;
     begin
       fActiveLaserDrawing := nil;
+      fActiveLaserGlow := nil;
       fIsDragging := false;
       if IsMouseCaptured then
         Mouse.Capture(nil);
@@ -550,6 +588,27 @@ type
       fImage.SizeChanged += @imageSizeChanged;
       RenderOptions.SetBitmapScalingMode(fImage, BitmapScalingMode.HighQuality);
 
+      fLaserPointerGlowTransform := new TranslateTransform;
+      var laserPointerGlowBrush := new RadialGradientBrush;
+      laserPointerGlowBrush.Center := new Point(0.5, 0.5);
+      laserPointerGlowBrush.GradientOrigin := new Point(0.5, 0.5);
+      laserPointerGlowBrush.RadiusX := 0.5;
+      laserPointerGlowBrush.RadiusY := 0.5;
+      laserPointerGlowBrush.GradientStops.Add(new GradientStop(Color.FromArgb(96, 255, 13, 13), 0.0));
+      laserPointerGlowBrush.GradientStops.Add(new GradientStop(Color.FromArgb(72, 255, 13, 13), 0.35));
+      laserPointerGlowBrush.GradientStops.Add(new GradientStop(Color.FromArgb(36, 255, 13, 13), 0.65));
+      laserPointerGlowBrush.GradientStops.Add(new GradientStop(Color.FromArgb(0, 255, 13, 13), 1.0));
+
+      fLaserPointerGlow := new System.Windows.Shapes.Ellipse;
+      fLaserPointerGlow.Fill := laserPointerGlowBrush;
+      fLaserPointerGlow.Height := LaserPointerGlowRadius * 2.0;
+      fLaserPointerGlow.HorizontalAlignment := HorizontalAlignment.Left;
+      fLaserPointerGlow.IsHitTestVisible := false;
+      fLaserPointerGlow.RenderTransform := fLaserPointerGlowTransform;
+      fLaserPointerGlow.VerticalAlignment := VerticalAlignment.Top;
+      fLaserPointerGlow.Visibility := Visibility.Collapsed;
+      fLaserPointerGlow.Width := LaserPointerGlowRadius * 2.0;
+
       fSpotlightBrush := new RadialGradientBrush;
       fSpotlightBrush.Center := new Point(0.0, 0.0);
       fSpotlightBrush.GradientOrigin := new Point(0.0, 0.0);
@@ -576,7 +635,7 @@ type
 
       fLaserPointer := new System.Windows.Shapes.Ellipse;
       fLaserPointer.Fill := new SolidColorBrush(Color.FromArgb(245, 255, 13, 13));
-      fLaserPointer.Height := LaserPointerRadius * 2.0;
+      fLaserPointer.Height := LaserPointerCoreRadius * 2.0;
       fLaserPointer.HorizontalAlignment := HorizontalAlignment.Left;
       fLaserPointer.IsHitTestVisible := false;
       fLaserPointer.RenderTransform := fLaserPointerTransform;
@@ -584,7 +643,7 @@ type
       fLaserPointer.StrokeThickness := 1.0;
       fLaserPointer.VerticalAlignment := VerticalAlignment.Top;
       fLaserPointer.Visibility := Visibility.Collapsed;
-      fLaserPointer.Width := LaserPointerRadius * 2.0;
+      fLaserPointer.Width := LaserPointerCoreRadius * 2.0;
 
       fHudText := new TextBlock;
       fHudText.FontFamily := new FontFamily('Consolas');
@@ -613,6 +672,7 @@ type
       fRoot.Children.Add(fImage);
       fRoot.Children.Add(fSpotlightLayer);
       fRoot.Children.Add(fLaserDrawingLayer);
+      fRoot.Children.Add(fLaserPointerGlow);
       fRoot.Children.Add(fLaserPointer);
       fRoot.Children.Add(fHud);
       Content := fRoot;
