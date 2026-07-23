@@ -17,7 +17,6 @@ type
     fStatusItem: NSStatusItem;
     fPresentItem: NSMenuItem;
     fPermissionItem: NSMenuItem;
-    fInputMonitoringItem: NSMenuItem;
     fStatusTextItem: NSMenuItem;
     fGlobalHotKey: MacGlobalHotKey;
     fHotKeyRegistrationStatus: OSStatus;
@@ -34,9 +33,6 @@ type
 
     [IBAction]
     method requestScreenRecordingPermission(sender: NSObject);
-
-    [IBAction]
-    method requestInputMonitoringPermission(sender: NSObject);
 
     [IBAction]
     method quitApplication(sender: NSObject);
@@ -87,10 +83,6 @@ begin
   fPermissionItem := new NSMenuItem withTitle('屏幕录制权限…') action(NSSelectorFromString('requestScreenRecordingPermission:')) keyEquivalent('');
   fPermissionItem.target := self;
   menu.addItem(fPermissionItem);
-
-  fInputMonitoringItem := new NSMenuItem withTitle('输入监控权限…') action(NSSelectorFromString('requestInputMonitoringPermission:')) keyEquivalent('');
-  fInputMonitoringItem.target := self;
-  menu.addItem(fInputMonitoringItem);
 
   fStatusTextItem := new NSMenuItem withTitle('空闲') action(nil) keyEquivalent('');
   fStatusTextItem.enabled := false;
@@ -171,13 +163,6 @@ begin
   if fPlatformActual.screenRecordingPermission <> WorkspacePermissionState.Granted then
     fPlatformActual.openScreenRecordingSettings;
   refreshStatusMenu;
-end;
-
-method AppDelegate.requestInputMonitoringPermission(sender: NSObject);
-begin
-  var settingsUrl := NSURL.URLWithString('x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent');
-  if settingsUrl <> nil then
-    NSWorkspace.sharedWorkspace.openURL(settingsUrl);
 end;
 
 method AppDelegate.quitApplication(sender: NSObject);
