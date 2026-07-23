@@ -1,7 +1,5 @@
 namespace MacApp;
 
-interface
-
 uses
   AppKit,
   RemObjects.Elements.RTL,
@@ -14,36 +12,26 @@ type
   private
     fImage: NSImage;
     method getIsReleased: Boolean;
+    begin
+      result := fImage = nil;
+    end;
   public
     constructor(image: NSImage);
+    begin
+      if image = nil then
+        raise new ArgumentNullException('image');
+
+      fImage := image;
+    end;
     property IsReleased: Boolean read getIsReleased;
     method imageForPresentation: NSImage;
+    begin
+      result := fImage;
+    end;
     method releaseFrame;
+    begin
+      fImage := nil;
+    end;
   end;
-
-implementation
-
-constructor MacWorkspaceFrame(image: NSImage);
-begin
-  if image = nil then
-    raise new ArgumentNullException('image');
-
-  fImage := image;
-end;
-
-method MacWorkspaceFrame.getIsReleased: Boolean;
-begin
-  result := fImage = nil;
-end;
-
-method MacWorkspaceFrame.imageForPresentation: NSImage;
-begin
-  result := fImage;
-end;
-
-method MacWorkspaceFrame.releaseFrame;
-begin
-  fImage := nil;
-end;
 
 end.

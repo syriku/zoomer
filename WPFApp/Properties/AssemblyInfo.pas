@@ -1,7 +1,5 @@
 namespace WPFApp;
 
-interface
-
 uses
   System.Reflection,
   System.Resources,
@@ -17,7 +15,5 @@ uses
 [assembly: AssemblyVersion('1.0.0.0')]
 [assembly: NeutralResourcesLanguage('zh-Hans')]
 [assembly: ComVisible(false)]
-
-implementation
 
 end.

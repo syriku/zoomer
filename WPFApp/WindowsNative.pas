@@ -1,7 +1,5 @@
 namespace WPFApp;
 
-interface
-
 uses
   System,
   System.Runtime.InteropServices,
@@ -19,7 +17,13 @@ type
   WindowsRect = public record
   private
     method get_Width: Int32;
+    begin
+      result := Right - Left;
+    end;
     method get_Height: Int32;
+    begin
+      result := Bottom - Top;
+    end;
   public
     Left: Int32;
     Top: Int32;
@@ -102,11 +106,69 @@ type
       SetWindowPosShowWindow: UInt32 = $0040;
 
     class method enablePerMonitorDpiAwareness;
+    begin
+      try
+        setProcessDpiAwarenessContext(new IntPtr(-4));
+      except
+        // Windows 10 之前的系统不提供 Per-Monitor V2；目标系统最低为 Windows 10。
+      end;
+    end;
     class method displayUnderPointer: WorkspaceDisplay;
+    begin
+      var point: WindowsPoint;
+      var monitorInfo: WindowsMonitorInfo;
+      if not getCursorPosition(var point) then
+        exit nil;
+
+      if not monitorInfoAtPoint(point) info(var monitorInfo) then
+        exit nil;
+
+      result := new WorkspaceDisplay(monitorInfo.DeviceName)
+        originX(monitorInfo.MonitorBounds.Left)
+        originY(monitorInfo.MonitorBounds.Top)
+        width(monitorInfo.MonitorBounds.Width)
+        height(monitorInfo.MonitorBounds.Height)
+        backingScale(1.0);
+    end;
     class method boundsForDisplay(display: WorkspaceDisplay) rectangle(var bounds: WindowsRect): Boolean;
+    begin
+      var point: WindowsPoint;
+      var monitorInfo: WindowsMonitorInfo;
+      if not assigned(display) then
+        exit false;
+
+      point.X := Int32(Math.Round(display.OriginX)) + 1;
+      point.Y := Int32(Math.Round(display.OriginY)) + 1;
+      if not monitorInfoAtPoint(point) info(var monitorInfo) then
+        exit false;
+
+      if not String.Equals(monitorInfo.DeviceName, display.DisplayId, StringComparison.OrdinalIgnoreCase) then
+        exit false;
+
+      bounds := monitorInfo.MonitorBounds;
+      result := true;
+    end;
     class method monitorInfoAtPoint(point: WindowsPoint) info(var monitorInfo: WindowsMonitorInfo): Boolean;
+    begin
+      var monitor := monitorFromPoint(point) options(MonitorDefaultToNull);
+      if monitor = IntPtr.Zero then
+        exit false;
+
+      monitorInfo := default(WindowsMonitorInfo);
+      monitorInfo.Size := UInt32(Marshal.SizeOf(typeOf(WindowsMonitorInfo)));
+      result := getMonitorInfo(monitor) info(var monitorInfo);
+    end;
     class method signedHighWord(value: IntPtr): Int32;
+    begin
+      var wordValue := Int32((value.ToInt64 shr 16) and $FFFF);
+      if wordValue >= $8000 then
+        wordValue := wordValue - $10000;
+      result := wordValue;
+    end;
     class method topmostWindowHandle: IntPtr;
+    begin
+      result := new IntPtr(-1);
+    end;
 
     [DllImport('user32.dll', EntryPoint := 'SetProcessDpiAwarenessContext')]
     class method setProcessDpiAwarenessContext(context: IntPtr): Boolean; external;
@@ -174,89 +236,5 @@ type
     [DllImport('user32.dll', EntryPoint := 'SetWindowPos', SetLastError := true)]
     class method setWindowPosition(windowHandle: IntPtr) insertAfterWindow(insertAfterHandle: IntPtr) x(left: Int32) y(top: Int32) width(pixelWidth: Int32) height(pixelHeight: Int32) options(positionFlags: UInt32): Boolean; external;
   end;
-
-implementation
-
-method WindowsRect.get_Width: Int32;
-begin
-  result := Right - Left;
-end;
-
-method WindowsRect.get_Height: Int32;
-begin
-  result := Bottom - Top;
-end;
-
-class method WindowsNative.enablePerMonitorDpiAwareness;
-begin
-  try
-    setProcessDpiAwarenessContext(new IntPtr(-4));
-  except
-    // Windows 10 之前的系统不提供 Per-Monitor V2；目标系统最低为 Windows 10。
-  end;
-end;
-
-class method WindowsNative.displayUnderPointer: WorkspaceDisplay;
-var
-  point: WindowsPoint;
-  monitorInfo: WindowsMonitorInfo;
-begin
-  if not getCursorPosition(var point) then
-    exit nil;
-
-  if not monitorInfoAtPoint(point) info(var monitorInfo) then
-    exit nil;
-
-  result := new WorkspaceDisplay(monitorInfo.DeviceName)
-    originX(monitorInfo.MonitorBounds.Left)
-    originY(monitorInfo.MonitorBounds.Top)
-    width(monitorInfo.MonitorBounds.Width)
-    height(monitorInfo.MonitorBounds.Height)
-    backingScale(1.0);
-end;
-
-class method WindowsNative.boundsForDisplay(display: WorkspaceDisplay) rectangle(var bounds: WindowsRect): Boolean;
-var
-  point: WindowsPoint;
-  monitorInfo: WindowsMonitorInfo;
-begin
-  if not assigned(display) then
-    exit false;
-
-  point.X := Int32(Math.Round(display.OriginX)) + 1;
-  point.Y := Int32(Math.Round(display.OriginY)) + 1;
-  if not monitorInfoAtPoint(point) info(var monitorInfo) then
-    exit false;
-
-  if not String.Equals(monitorInfo.DeviceName, display.DisplayId, StringComparison.OrdinalIgnoreCase) then
-    exit false;
-
-  bounds := monitorInfo.MonitorBounds;
-  result := true;
-end;
-
-class method WindowsNative.monitorInfoAtPoint(point: WindowsPoint) info(var monitorInfo: WindowsMonitorInfo): Boolean;
-begin
-  var monitor := monitorFromPoint(point) options(MonitorDefaultToNull);
-  if monitor = IntPtr.Zero then
-    exit false;
-
-  monitorInfo := default(WindowsMonitorInfo);
-  monitorInfo.Size := UInt32(Marshal.SizeOf(typeOf(WindowsMonitorInfo)));
-  result := getMonitorInfo(monitor) info(var monitorInfo);
-end;
-
-class method WindowsNative.signedHighWord(value: IntPtr): Int32;
-begin
-  var wordValue := Int32((value.ToInt64 shr 16) and $FFFF);
-  if wordValue >= $8000 then
-    wordValue := wordValue - $10000;
-  result := wordValue;
-end;
-
-class method WindowsNative.topmostWindowHandle: IntPtr;
-begin
-  result := new IntPtr(-1);
-end;
 
 end.

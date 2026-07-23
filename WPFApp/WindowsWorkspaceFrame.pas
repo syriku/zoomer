@@ -1,7 +1,5 @@
 namespace WPFApp;
 
-interface
-
 uses
   System,
   System.Windows.Media.Imaging,
@@ -14,35 +12,25 @@ type
   private
     fSource: BitmapSource;
     method get_IsReleased: Boolean;
+    begin
+      result := not assigned(fSource);
+    end;
   public
     constructor(source: BitmapSource);
+    begin
+      if not assigned(source) then
+        raise new ArgumentNullException('source');
+      fSource := source;
+    end;
     property IsReleased: Boolean read get_IsReleased;
     method sourceForPresentation: BitmapSource;
+    begin
+      result := fSource;
+    end;
     method releaseFrame;
+    begin
+      fSource := nil;
+    end;
   end;
-
-implementation
-
-constructor WindowsWorkspaceFrame(source: BitmapSource);
-begin
-  if not assigned(source) then
-    raise new ArgumentNullException('source');
-  fSource := source;
-end;
-
-method WindowsWorkspaceFrame.get_IsReleased: Boolean;
-begin
-  result := not assigned(fSource);
-end;
-
-method WindowsWorkspaceFrame.sourceForPresentation: BitmapSource;
-begin
-  result := fSource;
-end;
-
-method WindowsWorkspaceFrame.releaseFrame;
-begin
-  fSource := nil;
-end;
 
 end.
