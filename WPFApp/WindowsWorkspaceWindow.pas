@@ -20,12 +20,15 @@ type
   private
     const
       LaserPointerRadius: Double = 7.0;
+      SpotlightRadius: Double = 90.0;
       LaserDrawingHoldDurationSeconds: Double = 3.0;
       LaserDrawingFadeDurationSeconds: Double = 0.8;
       LaserDrawingMinimumPointDistanceSquared: Double = 0.25;
     fRoot: Grid;
     fImage: System.Windows.Controls.Image;
     fImageTransform: MatrixTransform;
+    fSpotlightLayer: System.Windows.Shapes.Rectangle;
+    fSpotlightBrush: RadialGradientBrush;
     fLaserDrawingLayer: Canvas;
     fLaserPointer: System.Windows.Shapes.Ellipse;
     fLaserPointerTransform: TranslateTransform;
@@ -43,6 +46,7 @@ type
     fPreviousDragPoint: Point;
     fIsDragging: Boolean;
     fLaserDrawingMode: Boolean;
+    fSpotlightActive: Boolean;
     fAllowsClose: Boolean;
     fDidRequestClose: Boolean;
     fIsClosed: Boolean;
@@ -102,6 +106,27 @@ type
     begin
       fLaserPointerTransform.X := point.X - LaserPointerRadius;
       fLaserPointerTransform.Y := point.Y - LaserPointerRadius;
+    end;
+    method updateSpotlightCenter(point: Point);
+    begin
+      if (not assigned(fRoot)) or (not assigned(fSpotlightBrush)) then
+        exit;
+
+      fSpotlightBrush.Center := point;
+      fSpotlightBrush.GradientOrigin := point;
+    end;
+    method setSpotlightActive(active: Boolean);
+    begin
+      if fSpotlightActive = active then
+        exit;
+
+      fSpotlightActive := active;
+      if active then begin
+        updateSpotlightCenter(Mouse.GetPosition(fRoot));
+        fSpotlightLayer.Visibility := Visibility.Visible;
+      end
+      else
+        fSpotlightLayer.Visibility := Visibility.Collapsed;
     end;
     method beginLaserDrawing(point: Point);
     begin
@@ -232,8 +257,8 @@ type
         exit false;
       end;
 
-      requestCommand(WorkspaceCommand.presetScale(requestedScale)
-        inViewportWidth(fRoot.ActualWidth) height(fRoot.ActualHeight));
+      requestCommand(WorkspaceCommand.presetScaleAtAnchor(requestedScale)
+        atX(fRoot.ActualWidth / 2.0) atY(fRoot.ActualHeight / 2.0));
       eventArgs.Handled := true;
       result := true;
     end;
@@ -276,6 +301,8 @@ type
       inherited OnMouseMove(eventArgs);
       var point := eventArgs.GetPosition(fRoot);
       updateLaserPointerCenter(point);
+      if fSpotlightActive then
+        updateSpotlightCenter(point);
       if fActiveLaserDrawing <> nil then begin
         if eventArgs.LeftButton <> MouseButtonState.Pressed then begin
           endMouseInteraction;
@@ -328,12 +355,13 @@ type
     method OnPreviewMouseWheel(eventArgs: MouseWheelEventArgs); override;
     begin
       inherited OnPreviewMouseWheel(eventArgs);
+      var point := eventArgs.GetPosition(fRoot);
       if (Keyboard.Modifiers and ModifierKeys.Control) <> ModifierKeys.None then
         requestCommand(WorkspaceCommand.magnifyWithAmount(eventArgs.Delta / 1200.0)
-          inViewportWidth(fRoot.ActualWidth) height(fRoot.ActualHeight))
+          atX(point.X) atY(point.Y))
       else
         requestCommand(WorkspaceCommand.scrollZoomWithDelta(eventArgs.Delta / 12.0)
-          inViewportWidth(fRoot.ActualWidth) height(fRoot.ActualHeight));
+          atX(point.X) atY(point.Y));
       eventArgs.Handled := true;
     end;
     method OnPreviewKeyDown(eventArgs: KeyEventArgs); override;
@@ -370,6 +398,14 @@ type
             exit;
           end;
 
+        Key.F:
+          begin
+            if not eventArgs.IsRepeat then
+              setSpotlightActive(true);
+            eventArgs.Handled := true;
+            exit;
+          end;
+
         Key.D:
           if hasNoShortcutModifiers then begin
             if not eventArgs.IsRepeat then
@@ -381,8 +417,24 @@ type
 
       inherited OnPreviewKeyDown(eventArgs);
     end;
+    method OnPreviewKeyUp(eventArgs: KeyEventArgs); override;
+    begin
+      if eventArgs.Key = Key.F then begin
+        setSpotlightActive(false);
+        eventArgs.Handled := true;
+        exit;
+      end;
+
+      inherited OnPreviewKeyUp(eventArgs);
+    end;
+    method OnLostKeyboardFocus(eventArgs: KeyboardFocusChangedEventArgs); override;
+    begin
+      setSpotlightActive(false);
+      inherited OnLostKeyboardFocus(eventArgs);
+    end;
     method OnClosing(eventArgs: CancelEventArgs); override;
     begin
+      setSpotlightActive(false);
       if not fAllowsClose then begin
         eventArgs.Cancel := true;
         if not fDidRequestClose then begin
@@ -397,6 +449,7 @@ type
     end;
     method OnDeactivated(eventArgs: EventArgs); override;
     begin
+      setSpotlightActive(false);
       setLaserPointerActive(false);
       endMouseInteraction;
       inherited OnDeactivated(eventArgs);
@@ -424,6 +477,24 @@ type
       fImage.Stretch := Stretch.Fill;
       fImage.SizeChanged += @imageSizeChanged;
       RenderOptions.SetBitmapScalingMode(fImage, BitmapScalingMode.HighQuality);
+
+      fSpotlightBrush := new RadialGradientBrush;
+      fSpotlightBrush.Center := new Point(0.0, 0.0);
+      fSpotlightBrush.GradientOrigin := new Point(0.0, 0.0);
+      fSpotlightBrush.MappingMode := BrushMappingMode.Absolute;
+      fSpotlightBrush.RadiusX := SpotlightRadius;
+      fSpotlightBrush.RadiusY := SpotlightRadius;
+      fSpotlightBrush.SpreadMethod := GradientSpreadMethod.Pad;
+      fSpotlightBrush.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), 0.0));
+      fSpotlightBrush.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), 0.72));
+      fSpotlightBrush.GradientStops.Add(new GradientStop(Color.FromArgb(184, 0, 0, 0), 1.0));
+
+      fSpotlightLayer := new System.Windows.Shapes.Rectangle;
+      fSpotlightLayer.Fill := fSpotlightBrush;
+      fSpotlightLayer.HorizontalAlignment := HorizontalAlignment.Stretch;
+      fSpotlightLayer.IsHitTestVisible := false;
+      fSpotlightLayer.VerticalAlignment := VerticalAlignment.Stretch;
+      fSpotlightLayer.Visibility := Visibility.Collapsed;
 
       fLaserDrawingLayer := new Canvas;
       fLaserDrawingLayer.ClipToBounds := true;
@@ -468,6 +539,7 @@ type
       fRoot.Background := Brushes.Black;
       fRoot.ClipToBounds := true;
       fRoot.Children.Add(fImage);
+      fRoot.Children.Add(fSpotlightLayer);
       fRoot.Children.Add(fLaserDrawingLayer);
       fRoot.Children.Add(fLaserPointer);
       fRoot.Children.Add(fHud);
@@ -546,6 +618,7 @@ type
       fAllowsClose := true;
       fQualityTimer.Stop;
       fHudDelayTimer.Stop;
+      setSpotlightActive(false);
       abortMouseInteraction;
       clearLaserDrawings;
       setLaserPointerActive(false);

@@ -227,13 +227,13 @@ type
     begin
       result := new WorkspaceCommand(WorkspaceCommandKind.Dismiss) firstValue(0.0) secondValue(0.0) thirdValue(0.0);
     end;
-    class method scrollZoomWithDelta(delta: Double) inViewportWidth(width: Double) height(viewportHeight: Double): WorkspaceCommand;
+    class method scrollZoomWithDelta(delta: Double) atX(anchorX: Double) atY(anchorY: Double): WorkspaceCommand;
     begin
-      result := new WorkspaceCommand(WorkspaceCommandKind.ScrollZoom) firstValue(delta) secondValue(width) thirdValue(viewportHeight);
+      result := new WorkspaceCommand(WorkspaceCommandKind.ScrollZoom) firstValue(delta) secondValue(anchorX) thirdValue(anchorY);
     end;
-    class method magnifyWithAmount(magnification: Double) inViewportWidth(width: Double) height(viewportHeight: Double): WorkspaceCommand;
+    class method magnifyWithAmount(magnification: Double) atX(anchorX: Double) atY(anchorY: Double): WorkspaceCommand;
     begin
-      result := new WorkspaceCommand(WorkspaceCommandKind.Magnify) firstValue(magnification) secondValue(width) thirdValue(viewportHeight);
+      result := new WorkspaceCommand(WorkspaceCommandKind.Magnify) firstValue(magnification) secondValue(anchorX) thirdValue(anchorY);
     end;
     class method panWithDeltaX(deltaX: Double) deltaY(y: Double): WorkspaceCommand;
     begin
@@ -251,9 +251,9 @@ type
     begin
       result := new WorkspaceCommand(WorkspaceCommandKind.Center) firstValue(width) secondValue(viewportHeight) thirdValue(0.0);
     end;
-    class method presetScale(scale: Double) inViewportWidth(width: Double) height(viewportHeight: Double): WorkspaceCommand;
+    class method presetScaleAtAnchor(scale: Double) atX(anchorX: Double) atY(anchorY: Double): WorkspaceCommand;
     begin
-      result := new WorkspaceCommand(WorkspaceCommandKind.PresetScale) firstValue(scale) secondValue(width) thirdValue(viewportHeight);
+      result := new WorkspaceCommand(WorkspaceCommandKind.PresetScale) firstValue(scale) secondValue(anchorX) thirdValue(anchorY);
     end;
     class method toggleHorizontalFlip: WorkspaceCommand;
     begin

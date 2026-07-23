@@ -34,6 +34,8 @@ type
     fLaserPointerVisible: Boolean;
     fLaserPointerCenter: NSPoint;
     fSystemCursorHidden: Boolean;
+    fSpotlightActive: Boolean;
+    fSpotlightCenter: NSPoint;
     fLaserDrawingMode: Boolean;
     fActiveLaserStroke: MacLaserStroke;
     fLaserStrokes: NSMutableArray;
@@ -47,6 +49,48 @@ type
     method pointForEvent(nativeEvent: NSEvent): NSPoint;
     begin
       result := convertPoint(nativeEvent.locationInWindow) fromView(nil);
+    end;
+    method currentMousePoint: NSPoint;
+    begin
+      if window <> nil then
+        exit convertPoint(window.mouseLocationOutsideOfEventStream) fromView(nil);
+
+      result := fLaserPointerCenter;
+    end;
+    method deactivateSpotlight;
+    begin
+      if not fSpotlightActive then
+        exit;
+
+      fSpotlightActive := false;
+      needsDisplay := true;
+    end;
+    method drawSpotlightInContext(context: CGContextRef);
+    begin
+      if not fSpotlightActive then
+        exit;
+
+      var components := new CGFloat[6];
+      components[0] := 0.0;
+      components[1] := 0.0;
+      components[2] := 0.0;
+      components[3] := 0.0;
+      components[4] := 0.0;
+      components[5] := 0.72;
+      var locations := new CGFloat[3];
+      locations[0] := 0.0;
+      locations[1] := 0.72;
+      locations[2] := 1.0;
+      var colorSpace := CGColorSpaceCreateDeviceGray;
+      var gradient := CGGradientCreateWithColorComponents(colorSpace, @components[0], @locations[0], 3);
+      if gradient <> nil then begin
+        CGContextSaveGState(context);
+        CGContextDrawRadialGradient(context, gradient, fSpotlightCenter, 0.0,
+          fSpotlightCenter, 90.0, CGGradientDrawingOptions.DrawsAfterEndLocation);
+        CGContextRestoreGState(context);
+        CGGradientRelease(gradient);
+      end;
+      CGColorSpaceRelease(colorSpace);
     end;
     method hideSystemCursor;
     begin
@@ -265,6 +309,8 @@ type
       hideSystemCursor;
       fLaserPointerVisible := true;
       fLaserPointerCenter := pointForEvent(nativeEvent);
+      if fSpotlightActive then
+        fSpotlightCenter := fLaserPointerCenter;
       needsDisplay := true;
     end;
     method mouseExited(nativeEvent: NSEvent); override;
@@ -278,11 +324,14 @@ type
       hideSystemCursor;
       fLaserPointerVisible := true;
       fLaserPointerCenter := pointForEvent(nativeEvent);
+      if fSpotlightActive then
+        fSpotlightCenter := fLaserPointerCenter;
       needsDisplay := true;
     end;
     method sendPresetScale(scale: Double);
     begin
-      requestCommand(WorkspaceCommand.presetScale(scale) inViewportWidth(bounds.size.width) height(bounds.size.height));
+      requestCommand(WorkspaceCommand.presetScaleAtAnchor(scale)
+        atX(bounds.size.width / 2.0) atY(bounds.size.height / 2.0));
     end;
     method requestCommand(command: WorkspaceCommand);
     begin
@@ -333,6 +382,7 @@ type
     method cleanupInteraction;
     begin
       fHasPreviousDragPoint := false;
+      deactivateSpotlight;
       clearLaserStrokes;
       deactivateLaserPointer;
       NSCursor.arrowCursor.set;
@@ -364,6 +414,7 @@ type
         CGContextRestoreGState(graphicsContext.CGContext);
 
       if graphicsContext <> nil then begin
+        drawSpotlightInContext(graphicsContext.CGContext);
         drawLaserStrokesInContext(graphicsContext.CGContext);
 
         if fLaserPointerVisible then begin
@@ -407,6 +458,8 @@ type
       var point := pointForEvent(nativeEvent);
       fLaserPointerVisible := true;
       fLaserPointerCenter := point;
+      if fSpotlightActive then
+        fSpotlightCenter := point;
       needsDisplay := true;
       if fActiveLaserStroke <> nil then begin
         appendLaserStrokePoint(canvasPointForViewPoint(point));
@@ -440,6 +493,7 @@ type
     method resignFirstResponder: Boolean; override;
     begin
       fHasPreviousDragPoint := false;
+      deactivateSpotlight;
       deactivateLaserPointer;
       NSCursor.arrowCursor.set;
       result := inherited resignFirstResponder;
@@ -451,13 +505,15 @@ type
         exit;
       end;
 
+      var point := pointForEvent(nativeEvent);
       requestCommand(WorkspaceCommand.scrollZoomWithDelta(nativeEvent.scrollingDeltaY)
-        inViewportWidth(bounds.size.width) height(bounds.size.height));
+        atX(point.x) atY(point.y));
     end;
     method magnifyWithEvent(nativeEvent: NSEvent); override;
     begin
+      var point := pointForEvent(nativeEvent);
       requestCommand(WorkspaceCommand.magnifyWithAmount(nativeEvent.magnification)
-        inViewportWidth(bounds.size.width) height(bounds.size.height));
+        atX(point.x) atY(point.y));
     end;
     method keyDown(nativeEvent: NSEvent); override;
     begin
@@ -525,9 +581,27 @@ type
             exit;
           end;
         end;
+
+        3: begin
+          if not nativeEvent.isARepeat and not fSpotlightActive then begin
+            fSpotlightCenter := currentMousePoint;
+            fSpotlightActive := true;
+            needsDisplay := true;
+          end;
+          exit;
+        end;
       end;
 
       inherited keyDown(nativeEvent);
+    end;
+    method keyUp(nativeEvent: NSEvent); override;
+    begin
+      if nativeEvent.keyCode = 3 then begin
+        deactivateSpotlight;
+        exit;
+      end;
+
+      inherited keyUp(nativeEvent);
     end;
   end;
 

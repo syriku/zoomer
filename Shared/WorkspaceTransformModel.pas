@@ -8,29 +8,38 @@ type
   private
     fTransform: WorkspaceTransform := WorkspaceTransform.identityTransform();
 
-    method zoomToScale(requestedScale: Double) inViewportWidth(viewportWidth: Double) height(viewportHeight: Double): Boolean;
+    method zoomToScale(requestedScale: Double) atX(anchorX: Double) atY(anchorY: Double): Boolean;
     begin
       var current: WorkspaceTransform;
       var nextScale: Double;
-      var imageCenterX: Double;
-      var imageCenterY: Double;
-      if (not isFinite(requestedScale)) or (not isFinite(viewportWidth)) or (not isFinite(viewportHeight)) or
-        (viewportWidth < 0.0) or (viewportHeight < 0.0) then
+      var ratio: Double;
+      var nextOffsetX: Double;
+      var nextOffsetY: Double;
+      if (not isFinite(requestedScale)) or (not isFinite(anchorX)) or (not isFinite(anchorY)) then
         exit false;
 
       current := fTransform;
-      nextScale := clampScale(requestedScale);
-      if nextScale = current.Scale then
+      if (not isFinite(current.Scale)) or (current.Scale <= 0.0) or
+        (not isFinite(current.OffsetX)) or (not isFinite(current.OffsetY)) then
         exit false;
 
-      // Keep the point at the center of the already transformed image fixed.
-      // The image is rendered at the viewport size before this transform, so
-      // its current center is offset + (viewportSize * currentScale / 2).
-      imageCenterX := current.OffsetX + (viewportWidth * current.Scale / 2.0);
-      imageCenterY := current.OffsetY + (viewportHeight * current.Scale / 2.0);
+      nextScale := clampScale(requestedScale);
+      if (not isFinite(nextScale)) or (nextScale <= 0.0) or (nextScale = current.Scale) then
+        exit false;
+
+      ratio := nextScale / current.Scale;
+      if not isFinite(ratio) then
+        exit false;
+
+      // Keep the canvas point under the anchor at the same screen position.
+      nextOffsetX := anchorX - ((anchorX - current.OffsetX) * ratio);
+      nextOffsetY := anchorY - ((anchorY - current.OffsetY) * ratio);
+      if (not isFinite(nextOffsetX)) or (not isFinite(nextOffsetY)) then
+        exit false;
+
       fTransform := new WorkspaceTransform(nextScale)
-        offsetX(imageCenterX - (viewportWidth * nextScale / 2.0))
-        offsetY(imageCenterY - (viewportHeight * nextScale / 2.0))
+        offsetX(nextOffsetX)
+        offsetY(nextOffsetY)
         horizontallyFlipped(current.IsHorizontallyFlipped);
       result := true;
     end;
@@ -54,44 +63,79 @@ type
 
     property Transform: WorkspaceTransform read fTransform;
 
-    method zoomByScrollDelta(delta: Double) inViewportWidth(viewportWidth: Double) height(viewportHeight: Double): Boolean;
+    method zoomByScrollDelta(delta: Double) atX(anchorX: Double) atY(anchorY: Double): Boolean;
     begin
       if not isFinite(delta) then
         exit false;
 
-      result := zoomByFactor(Math.Exp(delta * 0.025)) inViewportWidth(viewportWidth) height(viewportHeight);
+      result := zoomByFactor(Math.Exp(delta * 0.025)) atX(anchorX) atY(anchorY);
     end;
-    method zoomByMagnification(magnification: Double) inViewportWidth(viewportWidth: Double) height(viewportHeight: Double): Boolean;
+    method zoomByMagnification(magnification: Double) atX(anchorX: Double) atY(anchorY: Double): Boolean;
     begin
       if not isFinite(magnification) then
         exit false;
 
-      result := zoomToScale(fTransform.Scale + magnification) inViewportWidth(viewportWidth) height(viewportHeight);
+      result := zoomToScale(fTransform.Scale + magnification) atX(anchorX) atY(anchorY);
     end;
-    method zoomByFactor(factor: Double) inViewportWidth(viewportWidth: Double) height(viewportHeight: Double): Boolean;
+    method zoomByFactor(factor: Double) atX(anchorX: Double) atY(anchorY: Double): Boolean;
     begin
       if (not isFinite(factor)) or (factor <= 0.0) then
         exit false;
 
-      result := zoomToScale(fTransform.Scale * factor) inViewportWidth(viewportWidth) height(viewportHeight);
+      result := zoomToScale(fTransform.Scale * factor) atX(anchorX) atY(anchorY);
     end;
-    method setPresetScale(scale: Double) inViewportWidth(viewportWidth: Double) height(viewportHeight: Double): Boolean;
+    method setPresetScale(scale: Double) atX(anchorX: Double) atY(anchorY: Double): Boolean;
     begin
-      result := zoomToScale(scale) inViewportWidth(viewportWidth) height(viewportHeight);
+      result := zoomToScale(scale) atX(anchorX) atY(anchorY);
     end;
     method translateBy(deltaX: Double) deltaY(y: Double): Boolean;
     begin
       var current: WorkspaceTransform;
+      var nextOffsetX: Double;
+      var nextOffsetY: Double;
       if (not isFinite(deltaX)) or (not isFinite(y)) or ((deltaX = 0.0) and (y = 0.0)) then
         exit false;
 
       current := fTransform;
-      fTransform := new WorkspaceTransform(current.Scale) offsetX(current.OffsetX + deltaX) offsetY(current.OffsetY + y) horizontallyFlipped(current.IsHorizontallyFlipped);
+      nextOffsetX := current.OffsetX + deltaX;
+      nextOffsetY := current.OffsetY + y;
+      if (not isFinite(nextOffsetX)) or (not isFinite(nextOffsetY)) then
+        exit false;
+
+      fTransform := new WorkspaceTransform(current.Scale) offsetX(nextOffsetX) offsetY(nextOffsetY) horizontallyFlipped(current.IsHorizontallyFlipped);
       result := true;
     end;
     method resetScaleInViewport(viewportWidth: Double) height(viewportHeight: Double): Boolean;
     begin
-      result := zoomToScale(1.0) inViewportWidth(viewportWidth) height(viewportHeight);
+      var current: WorkspaceTransform;
+      var imageCenterX: Double;
+      var imageCenterY: Double;
+      var nextOffsetX: Double;
+      var nextOffsetY: Double;
+      if (not isFinite(viewportWidth)) or (not isFinite(viewportHeight)) or
+        (viewportWidth < 0.0) or (viewportHeight < 0.0) then
+        exit false;
+
+      current := fTransform;
+      if (not isFinite(current.Scale)) or (current.Scale <= 0.0) or
+        (not isFinite(current.OffsetX)) or (not isFinite(current.OffsetY)) then
+        exit false;
+
+      if current.Scale = 1.0 then
+        exit false;
+
+      imageCenterX := current.OffsetX + (viewportWidth * current.Scale / 2.0);
+      imageCenterY := current.OffsetY + (viewportHeight * current.Scale / 2.0);
+      nextOffsetX := imageCenterX - (viewportWidth / 2.0);
+      nextOffsetY := imageCenterY - (viewportHeight / 2.0);
+      if (not isFinite(nextOffsetX)) or (not isFinite(nextOffsetY)) then
+        exit false;
+
+      fTransform := new WorkspaceTransform(1.0)
+        offsetX(nextOffsetX)
+        offsetY(nextOffsetY)
+        horizontallyFlipped(current.IsHorizontallyFlipped);
+      result := true;
     end;
     method resetTransform: Boolean;
     begin
@@ -114,6 +158,9 @@ type
       current := fTransform;
       offsetX := (width - (width * current.Scale)) / 2.0;
       offsetY := (viewportHeight - (viewportHeight * current.Scale)) / 2.0;
+      if (not isFinite(offsetX)) or (not isFinite(offsetY)) then
+        exit false;
+
       if (offsetX = current.OffsetX) and (offsetY = current.OffsetY) then
         exit false;
 

@@ -278,11 +278,11 @@ type
           dismissWorkspace();
 
         WorkspaceCommandKind.ScrollZoom:
-          if fTransformModel.zoomByScrollDelta(command.FirstValue) inViewportWidth(command.SecondValue) height(command.ThirdValue) then
+          if fTransformModel.zoomByScrollDelta(command.FirstValue) atX(command.SecondValue) atY(command.ThirdValue) then
             renderCurrentTransform(true);
 
         WorkspaceCommandKind.Magnify:
-          if fTransformModel.zoomByMagnification(command.FirstValue) inViewportWidth(command.SecondValue) height(command.ThirdValue) then
+          if fTransformModel.zoomByMagnification(command.FirstValue) atX(command.SecondValue) atY(command.ThirdValue) then
             renderCurrentTransform(true);
 
         WorkspaceCommandKind.Pan:
@@ -306,7 +306,7 @@ type
             renderCurrentTransform(false);
 
         WorkspaceCommandKind.PresetScale:
-          if fTransformModel.setPresetScale(command.FirstValue) inViewportWidth(command.SecondValue) height(command.ThirdValue) then
+          if fTransformModel.setPresetScale(command.FirstValue) atX(command.SecondValue) atY(command.ThirdValue) then
             renderCurrentTransform(true);
 
         WorkspaceCommandKind.ToggleHorizontalFlip:
