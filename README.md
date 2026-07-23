@@ -1,4 +1,4 @@
-# Zoomer（RemObjects Elements 迁移版）
+﻿# Zoomer（RemObjects Elements 迁移版）
 
 Zoomer 是一个面向 macOS 和 Windows 的桌面放大镜。它截取鼠标所在显示器的一帧画面，并提供缩放、平移、水平翻转、激光笔与聚光等演示辅助功能；截图不会保存或传输。
 

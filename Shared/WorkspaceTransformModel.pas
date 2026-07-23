@@ -1,4 +1,4 @@
-namespace Core;
+﻿namespace Core;
 
 uses
   RemObjects.Elements.RTL;

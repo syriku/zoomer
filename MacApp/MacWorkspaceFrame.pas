@@ -1,4 +1,4 @@
-namespace MacApp;
+﻿namespace MacApp;
 
 uses
   AppKit,

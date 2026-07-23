@@ -1,4 +1,4 @@
-namespace WPFApp;
+﻿namespace WPFApp;
 
 uses
   System,

@@ -1,4 +1,4 @@
-namespace WPFApp;
+﻿namespace WPFApp;
 
 uses
   System,
@@ -142,7 +142,7 @@ type
       if assigned(fSpotlightAnimationTimer) then
         fSpotlightAnimationTimer.Stop;
     end;
-    method animateSpotlight(sender: Object) eventArgs: EventArgs;
+    method animateSpotlight(sender: Object) eventArgs(eventArgs: EventArgs);
     begin
       var elapsed := (DateTime.UtcNow - fSpotlightAnimationStartTime).TotalSeconds;
       var progress := Math.Min(1.0, elapsed / SpotlightAnimationDurationSeconds);
@@ -260,10 +260,9 @@ type
       fade.FillBehavior := FillBehavior.HoldEnd;
       fade.From := 1.0;
       fade.To := 0.0;
-      fade.Completed += method(sender: Object) eventArgs: EventArgs
-        begin
-          removeLaserDrawing(drawing);
-        end;
+      fade.Completed += (sender, eventArgs) -> begin
+        removeLaserDrawing(drawing);
+      end;
       drawing.BeginAnimation(UIElement.OpacityProperty, fade);
     end;
     method clearLaserDrawings;
