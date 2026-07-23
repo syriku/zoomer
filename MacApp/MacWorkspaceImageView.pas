@@ -1,4 +1,4 @@
-namespace MacApp;
+﻿namespace MacApp;
 
 uses
   AppKit,
@@ -24,6 +24,12 @@ type
 
   MacWorkspaceImageView = public class(NSView)
   private
+    const
+    SpotlightRadius: Double = 90.0;
+    SpotlightTransparentStop: Double = 0.72;
+    SpotlightAnimationDurationSeconds: Double = 0.24;
+
+    var
     fCommandRequested: WorkspaceCommandRequested;
     fDismissRequested: WorkspaceSurfaceRequested;
     fPreviousDragPoint: NSPoint;
@@ -35,7 +41,13 @@ type
     fLaserPointerCenter: NSPoint;
     fSystemCursorHidden: Boolean;
     fSpotlightActive: Boolean;
+    fSpotlightVisible: Boolean;
     fSpotlightCenter: NSPoint;
+    fSpotlightRadius: Double;
+    fSpotlightAnimationStartRadius: Double;
+    fSpotlightAnimationTargetRadius: Double;
+    fSpotlightAnimationStartTime: Double;
+    fSpotlightAnimationTimer: NSTimer;
     fLaserDrawingMode: Boolean;
     fActiveLaserStroke: MacLaserStroke;
     fLaserStrokes: NSMutableArray;
@@ -57,17 +69,76 @@ type
 
       result := fLaserPointerCenter;
     end;
+    method maximumSpotlightRadius: Double;
+    begin
+      var width := bounds.size.width;
+      var height := bounds.size.height;
+      result := (Math.Sqrt((width * width) + (height * height)) / SpotlightTransparentStop) + 1.0;
+    end;
+    method stopSpotlightAnimation;
+    begin
+      if fSpotlightAnimationTimer <> nil then begin
+        fSpotlightAnimationTimer.invalidate;
+        fSpotlightAnimationTimer := nil;
+      end;
+    end;
+    method animateSpotlight;
+    begin
+      if fSpotlightAnimationTimer = nil then
+        exit;
+
+      var elapsed := CACurrentMediaTime - fSpotlightAnimationStartTime;
+      var progress := Math.Min(1.0, elapsed / SpotlightAnimationDurationSeconds);
+      var easedProgress := progress * progress * (3.0 - (2.0 * progress));
+      fSpotlightRadius := fSpotlightAnimationStartRadius +
+        ((fSpotlightAnimationTargetRadius - fSpotlightAnimationStartRadius) * easedProgress);
+      if progress >= 1.0 then begin
+        fSpotlightRadius := fSpotlightAnimationTargetRadius;
+        stopSpotlightAnimation;
+        if not fSpotlightActive then
+          fSpotlightVisible := false;
+      end;
+      needsDisplay := true;
+    end;
+    method startSpotlightAnimation(targetRadius: Double);
+    begin
+      fSpotlightVisible := true;
+      fSpotlightAnimationTargetRadius := Math.Max(0.0, targetRadius);
+      fSpotlightAnimationStartRadius := fSpotlightRadius;
+      fSpotlightAnimationStartTime := CACurrentMediaTime;
+      stopSpotlightAnimation;
+      if Math.Abs(fSpotlightAnimationTargetRadius - fSpotlightAnimationStartRadius) < 0.5 then begin
+        fSpotlightRadius := fSpotlightAnimationTargetRadius;
+        if not fSpotlightActive then
+          fSpotlightVisible := false;
+        needsDisplay := true;
+        exit;
+      end;
+
+      fSpotlightAnimationTimer := NSTimer.scheduledTimerWithTimeInterval(1.0 / 60.0) repeats(true) &block(method(aTimer: NSTimer)
+      begin
+        animateSpotlight;
+      end);
+      needsDisplay := true;
+    end;
     method deactivateSpotlight;
     begin
       if not fSpotlightActive then
         exit;
 
       fSpotlightActive := false;
+      startSpotlightAnimation(maximumSpotlightRadius);
+    end;
+    method cancelSpotlight;
+    begin
+      stopSpotlightAnimation;
+      fSpotlightActive := false;
+      fSpotlightVisible := false;
       needsDisplay := true;
     end;
     method drawSpotlightInContext(context: CGContextRef);
     begin
-      if not fSpotlightActive then
+      if (not fSpotlightVisible) or (fSpotlightRadius <= 0.0) then
         exit;
 
       var components := new CGFloat[6];
@@ -76,17 +147,17 @@ type
       components[2] := 0.0;
       components[3] := 0.0;
       components[4] := 0.0;
-      components[5] := 0.72;
+      components[5] := SpotlightTransparentStop;
       var locations := new CGFloat[3];
       locations[0] := 0.0;
-      locations[1] := 0.72;
+      locations[1] := SpotlightTransparentStop;
       locations[2] := 1.0;
       var colorSpace := CGColorSpaceCreateDeviceGray;
       var gradient := CGGradientCreateWithColorComponents(colorSpace, @components[0], @locations[0], 3);
       if gradient <> nil then begin
         CGContextSaveGState(context);
         CGContextDrawRadialGradient(context, gradient, fSpotlightCenter, 0.0,
-          fSpotlightCenter, 90.0, CGGradientDrawingOptions.DrawsAfterEndLocation);
+          fSpotlightCenter, fSpotlightRadius, CGGradientDrawingOptions.DrawsAfterEndLocation);
         CGContextRestoreGState(context);
         CGGradientRelease(gradient);
       end;
@@ -156,9 +227,9 @@ type
         exit;
 
       fLaserTrailTimer := NSTimer.scheduledTimerWithTimeInterval(1.0 / 60.0) repeats(true) &block(method(aTimer: NSTimer)
-        begin
-          updateLaserTrails;
-        end);
+      begin
+        updateLaserTrails;
+      end);
     end;
     method updateLaserTrails;
     begin
@@ -290,7 +361,7 @@ type
 
       CGContextRestoreGState(context);
     end;
-    public
+  public
     method updateTrackingAreas; override;
     begin
       inherited updateTrackingAreas;
@@ -382,7 +453,7 @@ type
     method cleanupInteraction;
     begin
       fHasPreviousDragPoint := false;
-      deactivateSpotlight;
+      cancelSpotlight;
       clearLaserStrokes;
       deactivateLaserPointer;
       NSCursor.arrowCursor.set;
@@ -525,71 +596,74 @@ type
         53: begin
           requestDismissal;
           exit;
-        end;
+          end;
 
         29, 82: begin
           if not nativeEvent.isARepeat and ((modifiers = 0) or (modifiers = NSEventModifierFlags.NSCommandKeyMask)) then begin
             requestCommand(WorkspaceCommand.resetScaleInViewport(bounds.size.width) height(bounds.size.height));
             exit;
           end;
-        end;
+          end;
 
         15: begin
           if not nativeEvent.isARepeat and not hasShortcutModifier then begin
             requestCommand(WorkspaceCommand.resetWorkspace);
             exit;
           end;
-        end;
+          end;
 
         8: begin
           if not nativeEvent.isARepeat and not hasShortcutModifier then begin
             requestCommand(WorkspaceCommand.centerInViewport(bounds.size.width) height(bounds.size.height));
             exit;
           end;
-        end;
+          end;
 
         18, 83: begin
           if not nativeEvent.isARepeat and not hasShortcutModifier then begin
             sendPresetScale(1.5);
             exit;
           end;
-        end;
+          end;
 
         19, 84: begin
           if not nativeEvent.isARepeat and not hasShortcutModifier then begin
             sendPresetScale(2.0);
             exit;
           end;
-        end;
+          end;
 
         25, 92: begin
           if not nativeEvent.isARepeat and not hasShortcutModifier then begin
             sendPresetScale(0.7);
             exit;
           end;
-        end;
+          end;
 
         46: begin
           if not nativeEvent.isARepeat then
             requestCommand(WorkspaceCommand.toggleHorizontalFlip);
           exit;
-        end;
+          end;
 
         2: begin
           if not nativeEvent.isARepeat and not hasShortcutModifier then begin
             fLaserDrawingMode := not fLaserDrawingMode;
             exit;
           end;
-        end;
+          end;
 
         3: begin
           if not nativeEvent.isARepeat and not fSpotlightActive then begin
             fSpotlightCenter := currentMousePoint;
             fSpotlightActive := true;
+            if not fSpotlightVisible then
+              fSpotlightRadius := maximumSpotlightRadius;
+            startSpotlightAnimation(SpotlightRadius);
             needsDisplay := true;
           end;
           exit;
-        end;
+          end;
       end;
 
       inherited keyDown(nativeEvent);

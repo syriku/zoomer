@@ -21,9 +21,13 @@ type
     const
       LaserPointerRadius: Double = 7.0;
       SpotlightRadius: Double = 90.0;
+      SpotlightTransparentStop: Double = 0.72;
+      SpotlightAnimationDurationSeconds: Double = 0.24;
       LaserDrawingHoldDurationSeconds: Double = 3.0;
       LaserDrawingFadeDurationSeconds: Double = 0.8;
       LaserDrawingMinimumPointDistanceSquared: Double = 0.25;
+
+    var
     fRoot: Grid;
     fImage: System.Windows.Controls.Image;
     fImageTransform: MatrixTransform;
@@ -47,6 +51,12 @@ type
     fIsDragging: Boolean;
     fLaserDrawingMode: Boolean;
     fSpotlightActive: Boolean;
+    fSpotlightVisible: Boolean;
+    fSpotlightRadius: Double;
+    fSpotlightAnimationStartRadius: Double;
+    fSpotlightAnimationTargetRadius: Double;
+    fSpotlightAnimationStartTime: DateTime;
+    fSpotlightAnimationTimer: DispatcherTimer;
     fAllowsClose: Boolean;
     fDidRequestClose: Boolean;
     fIsClosed: Boolean;
@@ -115,18 +125,81 @@ type
       fSpotlightBrush.Center := point;
       fSpotlightBrush.GradientOrigin := point;
     end;
+    method maximumSpotlightRadius: Double;
+    begin
+      var width := fRoot.ActualWidth;
+      var height := fRoot.ActualHeight;
+      result := (Math.Sqrt((width * width) + (height * height)) / SpotlightTransparentStop) + 1.0;
+    end;
+    method setSpotlightRadius(radius: Double);
+    begin
+      fSpotlightRadius := Math.Max(0.0, radius);
+      fSpotlightBrush.RadiusX := fSpotlightRadius;
+      fSpotlightBrush.RadiusY := fSpotlightRadius;
+    end;
+    method stopSpotlightAnimation;
+    begin
+      if assigned(fSpotlightAnimationTimer) then
+        fSpotlightAnimationTimer.Stop;
+    end;
+    method animateSpotlight(sender: Object) eventArgs: EventArgs;
+    begin
+      var elapsed := (DateTime.UtcNow - fSpotlightAnimationStartTime).TotalSeconds;
+      var progress := Math.Min(1.0, elapsed / SpotlightAnimationDurationSeconds);
+      var easedProgress := progress * progress * (3.0 - (2.0 * progress));
+      setSpotlightRadius(fSpotlightAnimationStartRadius +
+        ((fSpotlightAnimationTargetRadius - fSpotlightAnimationStartRadius) * easedProgress));
+      if progress >= 1.0 then begin
+        setSpotlightRadius(fSpotlightAnimationTargetRadius);
+        stopSpotlightAnimation;
+        if not fSpotlightActive then begin
+          fSpotlightVisible := false;
+          fSpotlightLayer.Visibility := Visibility.Collapsed;
+        end;
+      end;
+    end;
+    method startSpotlightAnimation(targetRadius: Double);
+    begin
+      fSpotlightVisible := true;
+      fSpotlightLayer.Visibility := Visibility.Visible;
+      fSpotlightAnimationStartRadius := fSpotlightRadius;
+      fSpotlightAnimationTargetRadius := Math.Max(0.0, targetRadius);
+      fSpotlightAnimationStartTime := DateTime.UtcNow;
+      if Math.Abs(fSpotlightAnimationTargetRadius - fSpotlightAnimationStartRadius) < 0.5 then begin
+        setSpotlightRadius(fSpotlightAnimationTargetRadius);
+        stopSpotlightAnimation;
+        if not fSpotlightActive then begin
+          fSpotlightVisible := false;
+          fSpotlightLayer.Visibility := Visibility.Collapsed;
+        end;
+        exit;
+      end;
+      fSpotlightAnimationTimer.Start;
+    end;
+    method cancelSpotlight;
+    begin
+      stopSpotlightAnimation;
+      fSpotlightActive := false;
+      fSpotlightVisible := false;
+      fSpotlightLayer.Visibility := Visibility.Collapsed;
+    end;
     method setSpotlightActive(active: Boolean);
     begin
-      if fSpotlightActive = active then
-        exit;
-
-      fSpotlightActive := active;
       if active then begin
+        if fSpotlightActive then
+          exit;
+        fSpotlightActive := true;
         updateSpotlightCenter(Mouse.GetPosition(fRoot));
-        fSpotlightLayer.Visibility := Visibility.Visible;
+        if not fSpotlightVisible then
+          setSpotlightRadius(maximumSpotlightRadius);
+        startSpotlightAnimation(SpotlightRadius);
       end
-      else
-        fSpotlightLayer.Visibility := Visibility.Collapsed;
+      else begin
+        if not fSpotlightActive then
+          exit;
+        fSpotlightActive := false;
+        startSpotlightAnimation(maximumSpotlightRadius);
+      end;
     end;
     method beginLaserDrawing(point: Point);
     begin
@@ -486,7 +559,7 @@ type
       fSpotlightBrush.RadiusY := SpotlightRadius;
       fSpotlightBrush.SpreadMethod := GradientSpreadMethod.Pad;
       fSpotlightBrush.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), 0.0));
-      fSpotlightBrush.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), 0.72));
+      fSpotlightBrush.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), SpotlightTransparentStop));
       fSpotlightBrush.GradientStops.Add(new GradientStop(Color.FromArgb(184, 0, 0, 0), 1.0));
 
       fSpotlightLayer := new System.Windows.Shapes.Rectangle;
@@ -552,6 +625,10 @@ type
       fHudDelayTimer := new DispatcherTimer(DispatcherPriority.Normal);
       fHudDelayTimer.Interval := TimeSpan.FromMilliseconds(800.0);
       fHudDelayTimer.Tick += @fadeHud;
+
+      fSpotlightAnimationTimer := new DispatcherTimer(DispatcherPriority.Render);
+      fSpotlightAnimationTimer.Interval := TimeSpan.FromMilliseconds(16.6667);
+      fSpotlightAnimationTimer.Tick += @animateSpotlight;
     end;
 
     property CommandRequested: WorkspaceCommandRequested read fCommandRequested write fCommandRequested;
@@ -618,7 +695,7 @@ type
       fAllowsClose := true;
       fQualityTimer.Stop;
       fHudDelayTimer.Stop;
-      setSpotlightActive(false);
+      cancelSpotlight;
       abortMouseInteraction;
       clearLaserDrawings;
       setLaserPointerActive(false);
