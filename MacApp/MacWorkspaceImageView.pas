@@ -25,9 +25,9 @@ type
     begin
       result := convertPoint(nativeEvent.locationInWindow) fromView(nil);
     end;
-    method sendPresetScale(scale: Double) atPoint(anchor: NSPoint);
+    method sendPresetScale(scale: Double);
     begin
-      requestCommand(WorkspaceCommand.presetScaleAtAnchor(scale) atX(anchor.x) atY(anchor.y));
+      requestCommand(WorkspaceCommand.presetScale(scale) inViewportWidth(bounds.size.width) height(bounds.size.height));
     end;
     method requestCommand(command: WorkspaceCommand);
     begin
@@ -123,13 +123,13 @@ type
         exit;
       end;
 
-      var anchor := pointForEvent(nativeEvent);
-      requestCommand(WorkspaceCommand.scrollZoomWithDelta(nativeEvent.scrollingDeltaY) atX(anchor.x) atY(anchor.y));
+      requestCommand(WorkspaceCommand.scrollZoomWithDelta(nativeEvent.scrollingDeltaY)
+        inViewportWidth(bounds.size.width) height(bounds.size.height));
     end;
     method magnifyWithEvent(nativeEvent: NSEvent); override;
     begin
-      var anchor := pointForEvent(nativeEvent);
-      requestCommand(WorkspaceCommand.magnifyWithAmount(nativeEvent.magnification) atX(anchor.x) atY(anchor.y));
+      requestCommand(WorkspaceCommand.magnifyWithAmount(nativeEvent.magnification)
+        inViewportWidth(bounds.size.width) height(bounds.size.height));
     end;
     method keyDown(nativeEvent: NSEvent); override;
     begin
@@ -137,7 +137,6 @@ type
         (NSEventModifierFlags.NSCommandKeyMask or NSEventModifierFlags.NSAlternateKeyMask or
         NSEventModifierFlags.NSControlKeyMask or NSEventModifierFlags.NSShiftKeyMask);
       var hasShortcutModifier: Boolean := modifiers <> 0;
-      var anchor := pointForEvent(nativeEvent);
       case nativeEvent.keyCode of
         53: begin
           requestDismissal;
@@ -146,7 +145,7 @@ type
 
         29, 82: begin
           if not nativeEvent.isARepeat and ((modifiers = 0) or (modifiers = NSEventModifierFlags.NSCommandKeyMask)) then begin
-            requestCommand(WorkspaceCommand.resetScale);
+            requestCommand(WorkspaceCommand.resetScaleInViewport(bounds.size.width) height(bounds.size.height));
             exit;
           end;
         end;
@@ -167,21 +166,21 @@ type
 
         18, 83: begin
           if not nativeEvent.isARepeat and not hasShortcutModifier then begin
-            sendPresetScale(1.5) atPoint(anchor);
+            sendPresetScale(1.5);
             exit;
           end;
         end;
 
         19, 84: begin
           if not nativeEvent.isARepeat and not hasShortcutModifier then begin
-            sendPresetScale(2.0) atPoint(anchor);
+            sendPresetScale(2.0);
             exit;
           end;
         end;
 
         25, 92: begin
           if not nativeEvent.isARepeat and not hasShortcutModifier then begin
-            sendPresetScale(0.7) atPoint(anchor);
+            sendPresetScale(0.7);
             exit;
           end;
         end;

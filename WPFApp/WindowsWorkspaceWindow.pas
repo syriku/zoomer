@@ -106,7 +106,7 @@ type
       var modifiers := Keyboard.Modifiers;
       var isZeroShortcut := (modifiers = ModifierKeys.None) or (modifiers = ModifierKeys.Control);
       if ((eventArgs.Key = Key.D0) or (eventArgs.Key = Key.NumPad0)) and isZeroShortcut then begin
-        requestCommand(WorkspaceCommand.resetScale);
+        requestCommand(WorkspaceCommand.resetScaleInViewport(fRoot.ActualWidth) height(fRoot.ActualHeight));
         eventArgs.Handled := true;
         exit true;
       end;
@@ -123,8 +123,8 @@ type
         exit false;
       end;
 
-      var anchor := Mouse.GetPosition(fRoot);
-      requestCommand(WorkspaceCommand.presetScaleAtAnchor(requestedScale) atX(anchor.X) atY(anchor.Y));
+      requestCommand(WorkspaceCommand.presetScale(requestedScale)
+        inViewportWidth(fRoot.ActualWidth) height(fRoot.ActualHeight));
       eventArgs.Handled := true;
       result := true;
     end;
@@ -180,11 +180,12 @@ type
     method OnPreviewMouseWheel(eventArgs: MouseWheelEventArgs); override;
     begin
       inherited OnPreviewMouseWheel(eventArgs);
-      var anchor := eventArgs.GetPosition(fRoot);
       if (Keyboard.Modifiers and ModifierKeys.Control) <> ModifierKeys.None then
-        requestCommand(WorkspaceCommand.magnifyWithAmount(eventArgs.Delta / 1200.0) atX(anchor.X) atY(anchor.Y))
+        requestCommand(WorkspaceCommand.magnifyWithAmount(eventArgs.Delta / 1200.0)
+          inViewportWidth(fRoot.ActualWidth) height(fRoot.ActualHeight))
       else
-        requestCommand(WorkspaceCommand.scrollZoomWithDelta(eventArgs.Delta / 12.0) atX(anchor.X) atY(anchor.Y));
+        requestCommand(WorkspaceCommand.scrollZoomWithDelta(eventArgs.Delta / 12.0)
+          inViewportWidth(fRoot.ActualWidth) height(fRoot.ActualHeight));
       eventArgs.Handled := true;
     end;
     method OnPreviewKeyDown(eventArgs: KeyEventArgs); override;

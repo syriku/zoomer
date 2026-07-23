@@ -227,21 +227,21 @@ type
     begin
       result := new WorkspaceCommand(WorkspaceCommandKind.Dismiss) firstValue(0.0) secondValue(0.0) thirdValue(0.0);
     end;
-    class method scrollZoomWithDelta(delta: Double) atX(x: Double) atY(y: Double): WorkspaceCommand;
+    class method scrollZoomWithDelta(delta: Double) inViewportWidth(width: Double) height(viewportHeight: Double): WorkspaceCommand;
     begin
-      result := new WorkspaceCommand(WorkspaceCommandKind.ScrollZoom) firstValue(delta) secondValue(x) thirdValue(y);
+      result := new WorkspaceCommand(WorkspaceCommandKind.ScrollZoom) firstValue(delta) secondValue(width) thirdValue(viewportHeight);
     end;
-    class method magnifyWithAmount(magnification: Double) atX(x: Double) atY(y: Double): WorkspaceCommand;
+    class method magnifyWithAmount(magnification: Double) inViewportWidth(width: Double) height(viewportHeight: Double): WorkspaceCommand;
     begin
-      result := new WorkspaceCommand(WorkspaceCommandKind.Magnify) firstValue(magnification) secondValue(x) thirdValue(y);
+      result := new WorkspaceCommand(WorkspaceCommandKind.Magnify) firstValue(magnification) secondValue(width) thirdValue(viewportHeight);
     end;
     class method panWithDeltaX(deltaX: Double) deltaY(y: Double): WorkspaceCommand;
     begin
       result := new WorkspaceCommand(WorkspaceCommandKind.Pan) firstValue(deltaX) secondValue(y) thirdValue(0.0);
     end;
-    class method resetScale: WorkspaceCommand;
+    class method resetScaleInViewport(width: Double) height(viewportHeight: Double): WorkspaceCommand;
     begin
-      result := new WorkspaceCommand(WorkspaceCommandKind.ResetScale) firstValue(0.0) secondValue(0.0) thirdValue(0.0);
+      result := new WorkspaceCommand(WorkspaceCommandKind.ResetScale) firstValue(0.0) secondValue(width) thirdValue(viewportHeight);
     end;
     class method resetWorkspace: WorkspaceCommand;
     begin
@@ -251,9 +251,9 @@ type
     begin
       result := new WorkspaceCommand(WorkspaceCommandKind.Center) firstValue(width) secondValue(viewportHeight) thirdValue(0.0);
     end;
-    class method presetScaleAtAnchor(scale: Double) atX(x: Double) atY(y: Double): WorkspaceCommand;
+    class method presetScale(scale: Double) inViewportWidth(width: Double) height(viewportHeight: Double): WorkspaceCommand;
     begin
-      result := new WorkspaceCommand(WorkspaceCommandKind.PresetScale) firstValue(scale) secondValue(x) thirdValue(y);
+      result := new WorkspaceCommand(WorkspaceCommandKind.PresetScale) firstValue(scale) secondValue(width) thirdValue(viewportHeight);
     end;
     class method toggleHorizontalFlip: WorkspaceCommand;
     begin
